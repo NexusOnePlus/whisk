@@ -124,7 +124,11 @@ class _WorkspaceBody extends StatelessWidget {
       controller: controller,
       onChanged: viewModel.updateActiveContent,
     );
-    final preview = PreviewPane(environment: viewModel.selectedEnvironment);
+    final preview = PreviewPane(
+      environment: viewModel.selectedEnvironment,
+      result: viewModel.renderResult,
+      onRender: viewModel.renderActiveFile,
+    );
 
     if (compact) {
       return Column(
