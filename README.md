@@ -13,6 +13,26 @@ source input and a preview area ready for renderer adapters.
 - Mermaid (`.mmd`)
 - Notes / Markdown (`.md`)
 
+## Architecture
+
+The project starts with a layered Flutter structure:
+
+```text
+lib/
+  data/        # repositories and future local/cloud services
+  domain/      # app models such as files and environments
+  ui/
+    core/      # theme, tokens and shared UI primitives
+    features/  # feature screens, widgets and view models
+```
+
+Render engines, collaboration transport, local storage and future cloud sync
+should enter through repositories/adapters instead of being called directly from
+widgets. This keeps Windows, Android and web support viable as the engine stack
+diverges by platform.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the detailed plan.
+
 ## Development
 
 ```powershell
