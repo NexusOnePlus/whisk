@@ -74,7 +74,7 @@ class _PreviewPaneState extends State<PreviewPane> {
                       foregroundColor: kAppBlack,
                       backgroundColor: kTextPrimary,
                       disabledForegroundColor: kTextMuted,
-                      disabledBackgroundColor: kPanelRaised,
+                      disabledBackgroundColor: kGlassHighlight,
                       minimumSize: Size(compact ? 38 : 0, 34),
                       padding: EdgeInsets.symmetric(
                         horizontal: compact ? 10 : 14,
@@ -104,7 +104,7 @@ class _PreviewPaneState extends State<PreviewPane> {
                     PopupMenuButton<_PreviewAction>(
                       tooltip: 'Preview options',
                       icon: const Icon(Icons.more_horiz),
-                      color: kPanelRaised,
+                      color: kGlassHighlight,
                       onSelected: (action) {
                         if (action == _PreviewAction.logs &&
                             result.log.isNotEmpty) {
@@ -188,7 +188,7 @@ class _PreviewPill extends StatelessWidget {
       height: 26,
       padding: const EdgeInsets.symmetric(horizontal: 9),
       decoration: BoxDecoration(
-        color: kPanelRaised,
+        color: kGlassHighlight,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: kBorder),
       ),
@@ -240,7 +240,7 @@ class _PreviewSurface extends StatelessWidget {
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: kPanel,
+        color: kGlassBase,
         border: Border.all(color: kBorder),
         borderRadius: BorderRadius.circular(8),
         gradient: result.hasPdf
@@ -250,7 +250,7 @@ class _PreviewSurface extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: [
                   kAccentBlue.withValues(alpha: 0.12),
-                  kPanel,
+                  kGlassBase,
                   kSuccessGreen.withValues(alpha: 0.05),
                 ],
                 stops: const [0, 0.45, 1],
@@ -388,7 +388,7 @@ class _PreviewMetric extends StatelessWidget {
       width: 120,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: kPanelRaised,
+        color: kGlassHighlight,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kBorder),
       ),

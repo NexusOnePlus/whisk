@@ -1,3 +1,5 @@
+import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
+
 class EditorTextOperation {
   const EditorTextOperation({
     required this.offset,
@@ -23,29 +25,66 @@ class EditorTextTransaction {
     required this.operations,
     required this.selectionOffsetBefore,
     required this.selectionOffsetAfter,
-    required this.cursorOffsetsBefore,
-    required this.cursorOffsetsAfter,
+    required this.cursorRangesBefore,
+    required this.cursorRangesAfter,
   });
 
   final List<EditorTextOperation> operations;
   final int selectionOffsetBefore;
   final int selectionOffsetAfter;
-  final List<int> cursorOffsetsBefore;
-  final List<int> cursorOffsetsAfter;
+  final List<EditorSelectionRange> cursorRangesBefore;
+  final List<EditorSelectionRange> cursorRangesAfter;
 
   factory EditorTextTransaction.single({
     required EditorTextOperation operation,
     required int selectionOffsetBefore,
     required int selectionOffsetAfter,
-    List<int> cursorOffsetsBefore = const [],
-    List<int> cursorOffsetsAfter = const [],
+    List<EditorSelectionRange> cursorRangesBefore = const [],
+    List<EditorSelectionRange> cursorRangesAfter = const [],
   }) {
     return EditorTextTransaction(
       operations: [operation],
       selectionOffsetBefore: selectionOffsetBefore,
       selectionOffsetAfter: selectionOffsetAfter,
-      cursorOffsetsBefore: cursorOffsetsBefore,
-      cursorOffsetsAfter: cursorOffsetsAfter,
+      cursorRangesBefore: cursorRangesBefore,
+      cursorRangesAfter: cursorRangesAfter,
+    );
+  }
+
+  bool canMergeWith(EditorTextTransaction next) {
+    if (operations.length != next.operations.length) return false;
+    if (cursorRangesAfter.length != next.cursorRangesBefore.length) {
+      return false;
+    }
+    for (var index = 0; index < operations.length; index++) {
+      final current = operations[index];
+      final incoming = next.operations[index];
+      if (current.deletedText.isNotEmpty || incoming.deletedText.isNotEmpty) {
+        return false;
+      }
+      if (current.offset + current.insertedText.length != incoming.offset) {
+        return false;
+      }
+    }
+    return selectionOffsetAfter == next.selectionOffsetBefore;
+  }
+
+  EditorTextTransaction mergeWith(EditorTextTransaction next) {
+    return EditorTextTransaction(
+      operations: [
+        for (var index = 0; index < operations.length; index++)
+          EditorTextOperation(
+            offset: operations[index].offset,
+            deletedText: '',
+            insertedText:
+                operations[index].insertedText +
+                next.operations[index].insertedText,
+          ),
+      ],
+      selectionOffsetBefore: selectionOffsetBefore,
+      selectionOffsetAfter: next.selectionOffsetAfter,
+      cursorRangesBefore: cursorRangesBefore,
+      cursorRangesAfter: next.cursorRangesAfter,
     );
   }
 

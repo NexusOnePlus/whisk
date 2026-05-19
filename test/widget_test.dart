@@ -6,9 +6,9 @@ void main() {
   testWidgets('shows the project dashboard', (tester) async {
     await tester.pumpWidget(const WhiskApp());
 
-    expect(find.text('Project Dashboard'), findsOneWidget);
+    expect(find.text('Create, reopen and collaborate across renderable projects.'), findsOneWidget);
     expect(find.text('New Project'), findsOneWidget);
-    expect(find.text('LaTeX Project'), findsOneWidget);
+    expect(find.text('LaTeX Draft'), findsOneWidget);
     expect(find.text('Typst Project'), findsOneWidget);
     expect(find.text('Open Projects'), findsOneWidget);
   });

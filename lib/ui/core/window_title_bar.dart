@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -7,48 +8,45 @@ class WindowTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: kPanel.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: kBorder),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x66000000),
-            blurRadius: 24,
-            offset: Offset(0, 8),
+    return GlassPanel(
+      borderRadius: 999,
+      opacity: 0.9,
+      blur: 24,
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: kBorder),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _WindowButton(
+                icon: Icons.remove,
+                tooltip: 'Minimize',
+                onPressed: windowManager.minimize,
+              ),
+              _WindowButton(
+                icon: Icons.crop_square,
+                tooltip: 'Maximize',
+                onPressed: () async {
+                  if (await windowManager.isMaximized()) {
+                    await windowManager.unmaximize();
+                  } else {
+                    await windowManager.maximize();
+                  }
+                },
+              ),
+              _WindowButton(
+                icon: Icons.close,
+                tooltip: 'Close',
+                danger: true,
+                onPressed: windowManager.close,
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(999),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _WindowButton(
-              icon: Icons.remove,
-              tooltip: 'Minimize',
-              onPressed: windowManager.minimize,
-            ),
-            _WindowButton(
-              icon: Icons.crop_square,
-              tooltip: 'Maximize',
-              onPressed: () async {
-                if (await windowManager.isMaximized()) {
-                  await windowManager.unmaximize();
-                } else {
-                  await windowManager.maximize();
-                }
-              },
-            ),
-            _WindowButton(
-              icon: Icons.close,
-              tooltip: 'Close',
-              danger: true,
-              onPressed: windowManager.close,
-            ),
-          ],
         ),
       ),
     );

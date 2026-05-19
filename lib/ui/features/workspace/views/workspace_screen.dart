@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pdfrx/pdfrx.dart';
+import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
 import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
@@ -7,6 +11,7 @@ import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dar
 import 'package:whisk/ui/features/workspace/widgets/preview_pane.dart';
 import 'package:whisk/ui/features/workspace/widgets/sidebar.dart';
 import 'package:whisk/ui/features/workspace/widgets/source_pane.dart';
+import 'package:whisk/ui/features/workspace/widgets/image_file_pane.dart';
 import 'package:whisk/ui/features/workspace/widgets/top_bar.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
@@ -34,6 +39,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   List<int> _findMatches = const [];
   int _revealRevision = 0;
   int? _revealOffset;
+  Timer? _contentSyncTimer;
+  String? _pendingContent;
 
   WorkspaceViewModel get viewModel => widget.viewModel;
 
@@ -52,6 +59,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   @override
   void dispose() {
+    _flushPendingContent();
+    _contentSyncTimer?.cancel();
     viewModel.removeListener(_syncControllerFromModel);
     _controller.dispose();
     _editorFocusNode.dispose();
@@ -61,10 +70,27 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   void _syncControllerFromModel() {
+    if (_pendingContent != null) return;
     final content = viewModel.activeFile.content;
     _controller.setEnvironment(viewModel.selectedEnvironment.id);
     if (_controller.text == content) return;
     _controller.setTextFromModel(content);
+  }
+
+  void _handleEditorChanged(String content) {
+    _pendingContent = content;
+    _contentSyncTimer?.cancel();
+    _contentSyncTimer = Timer(const Duration(milliseconds: 250), () {
+      _flushPendingContent();
+    });
+  }
+
+  void _flushPendingContent() {
+    final content = _pendingContent;
+    if (content == null) return;
+    _pendingContent = null;
+    if (!mounted && viewModel.activeFile.content == content) return;
+    viewModel.updateActiveContent(content);
   }
 
   void _toggleFind() {
@@ -139,8 +165,13 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   Widget build(BuildContext context) {
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true):
-            viewModel.saveActiveFile,
+        const SingleActivator(
+          LogicalKeyboardKey.keyS,
+          control: true,
+        ): () async {
+          _flushPendingContent();
+          await viewModel.saveActiveFile();
+        },
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             _toggleFind,
         const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
@@ -187,6 +218,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                               viewModel: viewModel,
                               controller: _controller,
                               editorFocusNode: _editorFocusNode,
+                              onEditorChanged: _handleEditorChanged,
                               revealRevision: _revealRevision,
                               revealOffset: _revealOffset,
                               compact: true,
@@ -204,6 +236,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                           files: viewModel.projectFiles,
                           environment: viewModel.selectedEnvironment,
                           onOpenFile: viewModel.openFile,
+                          onNewFile: viewModel.createFile,
+                          onDeleteFile: viewModel.deleteFile,
                         ),
                         Expanded(
                           child: Column(
@@ -234,6 +268,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                   viewModel: viewModel,
                                   controller: _controller,
                                   editorFocusNode: _editorFocusNode,
+                                  onEditorChanged: _handleEditorChanged,
                                   revealRevision: _revealRevision,
                                   revealOffset: _revealOffset,
                                 ),
@@ -277,88 +312,92 @@ class _FindBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 42,
-      padding: const EdgeInsets.fromLTRB(14, 4, 156, 6),
-      decoration: const BoxDecoration(
-        color: kPanel,
-        border: Border(bottom: BorderSide(color: kBorder)),
-      ),
-      child: Row(
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              onChanged: onChanged,
-              onSubmitted: (_) => onNext(),
-              style: const TextStyle(color: kTextPrimary, fontSize: 12),
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                prefixIcon: const Icon(Icons.search, size: 16),
-                prefixIconConstraints: const BoxConstraints(
-                  minWidth: 34,
-                  minHeight: 28,
-                ),
-                hintText: 'Find in file',
-                hintStyle: const TextStyle(color: kTextMuted, fontSize: 12),
-                filled: true,
-                fillColor: kAppBlack,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
-                  borderSide: const BorderSide(color: kBorder),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
-                  borderSide: const BorderSide(color: kBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
-                  borderSide: const BorderSide(color: kAccentBlue),
+    return GlassPanel(
+      borderRadius: 0,
+      opacity: 0.8,
+      blur: 32,
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.fromLTRB(14, 4, 156, 6),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: kBorder)),
+        ),
+        child: Row(
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                onChanged: onChanged,
+                onSubmitted: (_) => onNext(),
+                style: const TextStyle(color: kTextPrimary, fontSize: 12),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  prefixIcon: const Icon(Icons.search, size: 16),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 28,
+                  ),
+                  hintText: 'Find in file',
+                  hintStyle: const TextStyle(color: kTextMuted, fontSize: 12),
+                  filled: true,
+                  fillColor: kGlassBase.withOpacity(0.4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: const BorderSide(color: kBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: const BorderSide(color: kBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: const BorderSide(color: kAccentBlue),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            '$currentMatch / $matchCount',
-            style: const TextStyle(color: kTextMuted, fontSize: 12),
-          ),
-          const SizedBox(width: 6),
-          IconButton(
-            tooltip: 'Previous match',
-            onPressed: onPrevious,
-            icon: const Icon(Icons.keyboard_arrow_up),
-            color: kTextSecondary,
-            iconSize: 18,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            padding: EdgeInsets.zero,
-          ),
-          IconButton(
-            tooltip: 'Next match',
-            onPressed: onNext,
-            icon: const Icon(Icons.keyboard_arrow_down),
-            color: kTextSecondary,
-            iconSize: 18,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            padding: EdgeInsets.zero,
-          ),
-          const Spacer(),
-          IconButton(
-            tooltip: 'Close find',
-            onPressed: onClose,
-            icon: const Icon(Icons.close),
-            color: kTextSecondary,
-            iconSize: 17,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            padding: EdgeInsets.zero,
-          ),
-        ],
+            const SizedBox(width: 10),
+            Text(
+              '$currentMatch / $matchCount',
+              style: const TextStyle(color: kTextMuted, fontSize: 12),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              tooltip: 'Previous match',
+              onPressed: onPrevious,
+              icon: const Icon(Icons.keyboard_arrow_up),
+              color: kTextSecondary,
+              iconSize: 18,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+              padding: EdgeInsets.zero,
+            ),
+            IconButton(
+              tooltip: 'Next match',
+              onPressed: onNext,
+              icon: const Icon(Icons.keyboard_arrow_down),
+              color: kTextSecondary,
+              iconSize: 18,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+              padding: EdgeInsets.zero,
+            ),
+            const Spacer(),
+            IconButton(
+              tooltip: 'Close find',
+              onPressed: onClose,
+              icon: const Icon(Icons.close),
+              color: kTextSecondary,
+              iconSize: 17,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -369,6 +408,7 @@ class _WorkspaceBody extends StatelessWidget {
     required this.viewModel,
     required this.controller,
     required this.editorFocusNode,
+    required this.onEditorChanged,
     required this.revealRevision,
     this.revealOffset,
     this.compact = false,
@@ -377,25 +417,46 @@ class _WorkspaceBody extends StatelessWidget {
   final WorkspaceViewModel viewModel;
   final WhiskEditorController controller;
   final FocusNode editorFocusNode;
+  final ValueChanged<String> onEditorChanged;
   final int revealRevision;
   final int? revealOffset;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final editor = SourcePane(
-      environment: viewModel.selectedEnvironment,
-      controller: controller,
-      focusNode: editorFocusNode,
-      revealRevision: revealRevision,
-      revealOffset: revealOffset,
-      onChanged: viewModel.updateActiveContent,
-    );
+    final active = viewModel.activeFile;
+    final Widget editor;
+    if (active.isImage) {
+      editor = ImageFilePane(file: active);
+    } else if (active.isPdf) {
+      editor = Container(
+        color: kAppBlack,
+        child: PdfViewer.file(
+          active.path,
+          key: ValueKey(active.path),
+        ),
+      );
+    } else {
+      editor = SourcePane(
+        environment: viewModel.selectedEnvironment,
+        controller: controller,
+        focusNode: editorFocusNode,
+        revealRevision: revealRevision,
+        revealOffset: revealOffset,
+        onChanged: onEditorChanged,
+      );
+    }
     final preview = PreviewPane(
       environment: viewModel.selectedEnvironment,
       result: viewModel.renderResult,
       onRender: viewModel.renderActiveFile,
     );
+
+    final showPreview = !active.isImage && !active.isPdf;
+
+    if (!showPreview) {
+      return editor;
+    }
 
     if (compact) {
       return Column(

@@ -1,8 +1,8 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
+import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 enum ProjectSidebarSection { files, diagnostics, comments, renders }
@@ -14,6 +14,8 @@ class Sidebar extends StatelessWidget {
     required this.files,
     required this.environment,
     required this.onOpenFile,
+    required this.onNewFile,
+    required this.onDeleteFile,
     this.section = ProjectSidebarSection.files,
   });
 
@@ -21,31 +23,39 @@ class Sidebar extends StatelessWidget {
   final List<WhiskFile> files;
   final EnvironmentKind environment;
   final ValueChanged<WhiskFile> onOpenFile;
+  final ValueChanged<String> onNewFile;
+  final ValueChanged<WhiskFile> onDeleteFile;
   final ProjectSidebarSection section;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 292,
-      decoration: const BoxDecoration(
-        color: kPanel,
-        border: Border(right: BorderSide(color: kBorder)),
-      ),
-      child: Column(
-        children: [
-          _ProjectHeader(environment: environment, file: file),
-          _SidebarNav(section: section),
-          Expanded(
-            child: _SidebarBody(
-              section: section,
-              environment: environment,
-              file: file,
-              files: files,
-              onOpenFile: onOpenFile,
+    return GlassPanel(
+      borderRadius: 0,
+      opacity: 0.7,
+      blur: 28,
+      child: Container(
+        width: 292,
+        decoration: const BoxDecoration(
+          border: Border(right: BorderSide(color: kBorder)),
+        ),
+        child: Column(
+          children: [
+            _ProjectHeader(environment: environment, file: file),
+            _SidebarNav(section: section),
+            Expanded(
+              child: _SidebarBody(
+                section: section,
+                environment: environment,
+                file: file,
+                files: files,
+                onOpenFile: onOpenFile,
+                onNewFile: onNewFile,
+                onDeleteFile: onDeleteFile,
+              ),
             ),
-          ),
-          const _SidebarStatus(),
-        ],
+            const _SidebarStatus(),
+          ],
+        ),
       ),
     );
   }
@@ -67,13 +77,13 @@ class _ProjectHeader extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: kPanelRaised,
+              color: kGlassBase.withOpacity(0.4),
               borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: kAccentBlue.withValues(alpha: 0.45)),
+              border: Border.all(color: kAccentBlue.withValues(alpha: 0.3)),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [kAccentBlue.withValues(alpha: 0.22), kPanelRaised],
+                colors: [kAccentBlue.withValues(alpha: 0.15), Colors.transparent],
               ),
             ),
             child: Icon(environment.icon, color: kAccentBlue, size: 22),
@@ -184,7 +194,7 @@ class _NavButton extends StatelessWidget {
         child: Container(
           height: 34,
           decoration: BoxDecoration(
-            color: active ? kPanelRaised : Colors.transparent,
+            color: active ? kGlassHighlight : Colors.transparent,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Row(
@@ -220,6 +230,8 @@ class _SidebarBody extends StatelessWidget {
     required this.file,
     required this.files,
     required this.onOpenFile,
+    required this.onNewFile,
+    required this.onDeleteFile,
   });
 
   final ProjectSidebarSection section;
@@ -227,6 +239,8 @@ class _SidebarBody extends StatelessWidget {
   final WhiskFile file;
   final List<WhiskFile> files;
   final ValueChanged<WhiskFile> onOpenFile;
+  final ValueChanged<String> onNewFile;
+  final ValueChanged<WhiskFile> onDeleteFile;
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +250,8 @@ class _SidebarBody extends StatelessWidget {
         file: file,
         files: files,
         onOpenFile: onOpenFile,
+        onNewFile: onNewFile,
+        onDeleteFile: onDeleteFile,
       ),
       ProjectSidebarSection.diagnostics => const _EmptySection(
         icon: Icons.bug_report_outlined,
@@ -262,19 +278,34 @@ class _FilesSection extends StatelessWidget {
     required this.file,
     required this.files,
     required this.onOpenFile,
+    required this.onNewFile,
+    required this.onDeleteFile,
   });
 
   final EnvironmentKind environment;
   final WhiskFile file;
   final List<WhiskFile> files;
   final ValueChanged<WhiskFile> onOpenFile;
+  final ValueChanged<String> onNewFile;
+  final ValueChanged<WhiskFile> onDeleteFile;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        const _SectionLabel('Files'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const _SectionLabel('Files'),
+            IconButton(
+              icon: const Icon(Icons.add, size: 18),
+              tooltip: 'New file',
+              color: kTextSecondary,
+              onPressed: () => _handleNewFile(context),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         const _SearchBox(),
         const SizedBox(height: 12),
@@ -285,12 +316,45 @@ class _FilesSection extends StatelessWidget {
             detail: _detailFor(projectFile),
             selected: projectFile.path == file.path,
             onTap: () => onOpenFile(projectFile),
+            onDelete: projectFile.projectRoot != null ? () => _handleDeleteFile(context, projectFile) : null,
           ),
       ],
     );
   }
 
+  void _handleNewFile(BuildContext context) {
+    showDialog<String>(
+      context: context,
+      builder: (context) => const GlassInputDialog(
+        title: 'Create New File',
+        hintText: 'filename.tex',
+        confirmLabel: 'Create',
+      ),
+    ).then((fileName) {
+      if (fileName != null && fileName.trim().isNotEmpty) {
+        onNewFile(fileName.trim());
+      }
+    });
+  }
+
+  void _handleDeleteFile(BuildContext context, WhiskFile target) {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => GlassConfirmDialog(
+        title: 'Delete File',
+        message: 'Are you sure you want to delete ${target.name}? This action cannot be undone.',
+        confirmLabel: 'Delete',
+      ),
+    ).then((confirmed) {
+      if (confirmed == true) {
+        onDeleteFile(target);
+      }
+    });
+  }
+
   IconData _iconFor(WhiskFile file) {
+    if (file.isImage) return Icons.image_outlined;
+    if (file.isPdf) return Icons.picture_as_pdf_outlined;
     return switch (file.extension) {
       '.tex' => environment.icon,
       '.bib' => Icons.book_outlined,
@@ -320,7 +384,7 @@ class _SearchBox extends StatelessWidget {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: kPanelRaised,
+        color: kGlassHighlight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: kBorder),
       ),
@@ -348,6 +412,7 @@ class _FileRow extends StatelessWidget {
     required this.detail,
     this.selected = false,
     this.onTap,
+    this.onDelete,
   });
 
   final IconData icon;
@@ -355,6 +420,7 @@ class _FileRow extends StatelessWidget {
   final String detail;
   final bool selected;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -368,7 +434,7 @@ class _FileRow extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? kPanelRaised : Colors.transparent,
+            color: selected ? kGlassHighlight : Colors.transparent,
             borderRadius: BorderRadius.circular(13),
             border: Border.all(color: selected ? kBorder : Colors.transparent),
           ),
@@ -405,6 +471,14 @@ class _FileRow extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onDelete != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  color: kTextMuted,
+                  hoverColor: kDangerRed.withOpacity(0.1),
+                  tooltip: 'Delete file',
+                  onPressed: onDelete,
+                ),
             ],
           ),
         ),
@@ -482,7 +556,6 @@ class _SidebarStatus extends StatelessWidget {
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: const BoxDecoration(
-        color: kAppBlack,
         border: Border(top: BorderSide(color: kBorder)),
       ),
       child: const Row(
@@ -496,6 +569,180 @@ class _SidebarStatus extends StatelessWidget {
           Spacer(),
           Icon(Icons.sync, color: kTextMuted, size: 15),
         ],
+      ),
+    );
+  }
+}
+
+class GlassInputDialog extends StatelessWidget {
+  const GlassInputDialog({
+    super.key,
+    required this.title,
+    required this.hintText,
+    required this.confirmLabel,
+    this.initialValue = '',
+  });
+
+  final String title;
+  final String hintText;
+  final String confirmLabel;
+  final String initialValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = TextEditingController(text: initialValue);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
+      child: GlassPanel(
+        borderRadius: 16,
+        opacity: 0.8,
+        blur: 32,
+        child: Container(
+          width: 320,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            border: Border.all(color: kBorder),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                style: const TextStyle(color: kTextPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: hintText,
+                  hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+                  filled: true,
+                  fillColor: kGlassBase.withOpacity(0.4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kAccentBlue),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel', style: TextStyle(color: kTextMuted, fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(controller.text),
+                    style: TextButton.styleFrom(
+                      backgroundColor: kAccentBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                    child: Text(confirmLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GlassConfirmDialog extends StatelessWidget {
+  const GlassConfirmDialog({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+  });
+
+  final String title;
+  final String message;
+  final String confirmLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: GlassPanel(
+        borderRadius: 16,
+        opacity: 0.8,
+        blur: 32,
+        child: Container(
+          width: 320,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            border: Border.all(color: kBorder),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                style: const TextStyle(color: kTextSecondary, fontSize: 13, height: 1.35),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel', style: TextStyle(color: kTextMuted, fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: TextButton.styleFrom(
+                      backgroundColor: kDangerRed,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                    child: Text(confirmLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

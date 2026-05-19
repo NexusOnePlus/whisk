@@ -8,13 +8,28 @@ ThemeData buildWhiskTheme() {
     colorScheme: ColorScheme.fromSeed(
       seedColor: kAccentBlue,
       brightness: Brightness.dark,
-      surface: kPanel,
+      surface: kGlassBase,
+      surfaceContainer: kGlassBase.withOpacity(0.8),
+      onSurface: kTextPrimary,
+      outline: kBorder,
     ),
     scaffoldBackgroundColor: kAppBlack,
-    fontFamily: 'Segoe UI',
+    fontFamily: 'Inter',
+    fontFamilyFallback: const ['Segoe UI', 'sans-serif'],
+    cardTheme: CardThemeData(
+      color: kGlassBase.withOpacity(0.7),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 0,
+    ),
+    dividerTheme: const DividerThemeData(
+      color: kBorder,
+      thickness: 1,
+      space: 1,
+    ),
     textTheme: ThemeData.dark().textTheme.apply(
       bodyColor: kTextPrimary,
       displayColor: kTextPrimary,
+      fontFamily: 'Inter',
     ),
   );
 }

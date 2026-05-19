@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 class DashboardCard extends StatelessWidget {
@@ -15,36 +16,33 @@ class DashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: kPanel,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: kBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: kTextPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+    return GlassPanel(
+      borderRadius: 22,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: kTextPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-              ?trailing,
-            ],
-          ),
-          const SizedBox(height: 16),
-          child,
-        ],
+                if (trailing != null) trailing!,
+              ],
+            ),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
       ),
     );
   }

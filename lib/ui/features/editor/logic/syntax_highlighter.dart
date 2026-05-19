@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 class SyntaxHighlighter {
-  const SyntaxHighlighter();
+  SyntaxHighlighter();
+
+  final Map<(String, String, TextStyle), TextSpan> _cache = {};
 
   TextSpan highlight({
     required String text,
     required String environmentId,
     required TextStyle baseStyle,
   }) {
+    final key = (text, environmentId, baseStyle);
+    final cached = _cache[key];
+    if (cached != null) {
+      return cached;
+    }
+
     final rules = switch (environmentId) {
       'latex' => _latexRules,
       'typst' => _typstRules,
@@ -16,7 +24,12 @@ class SyntaxHighlighter {
       _ => _markdownRules,
     };
 
-    return TextSpan(style: baseStyle, children: _spansFor(text, rules));
+    final result = TextSpan(style: baseStyle, children: _spansFor(text, rules));
+    if (_cache.length > 5000) {
+      _cache.clear();
+    }
+    _cache[key] = result;
+    return result;
   }
 
   List<TextSpan> _spansFor(String text, List<_HighlightRule> rules) {

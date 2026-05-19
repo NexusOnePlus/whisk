@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:whisk/data/repositories/environment_catalog.dart';
 import 'package:whisk/data/services/document_render_service.dart';
+import 'package:whisk/data/services/file_watcher_service.dart';
+import 'package:whisk/data/services/project_open_service.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
@@ -11,15 +14,21 @@ class WorkspaceViewModel extends ChangeNotifier {
   WorkspaceViewModel({
     EnvironmentCatalog catalog = const EnvironmentCatalog(),
     this._renderService = const DocumentRenderService(),
+    this._watcherService = const FileWatcherService(),
+    this._openService = const ProjectOpenService(),
     WhiskFile? initialFile,
     List<WhiskFile>? projectFiles,
   }) : _environments = catalog.listEnvironments() {
     _activeFile = initialFile ?? _fileForEnvironment(_environments.first);
     _projectFiles = projectFiles ?? [_activeFile];
     _openFiles = [_activeFile];
+    _initWatcher();
   }
 
   final DocumentRenderService _renderService;
+  final FileWatcherService _watcherService;
+  final ProjectOpenService _openService;
+  StreamSubscription? _watcherSubscription;
   final List<EnvironmentKind> _environments;
   late WhiskFile _activeFile;
   late List<WhiskFile> _projectFiles;
@@ -64,7 +73,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (_disposed) return;
 
     var next = file;
-    if (next.content.isEmpty && next.projectRoot != null) {
+    if (next.content.isEmpty && next.projectRoot != null && !next.isImage && !next.isPdf) {
       final diskFile = File(next.path);
       if (await diskFile.exists()) {
         next = next.copyWith(content: await diskFile.readAsString());
@@ -118,7 +127,79 @@ class WorkspaceViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _watcherSubscription?.cancel();
     super.dispose();
+  }
+
+  void _initWatcher() {
+    final root = _activeFile.projectRoot;
+    if (root == null) return;
+
+    _watcherSubscription = _watcherService.watchDirectory(root).listen((event) {
+      if (_disposed) return;
+      _refreshProjectFiles();
+    });
+  }
+
+  Future<void> _refreshProjectFiles() async {
+    final root = _activeFile.projectRoot;
+    if (root == null) return;
+
+    final files = await _openService.listDirectoryFiles(root);
+    if (_disposed) return;
+
+    _projectFiles = files
+        .map(
+          (file) => WhiskFile(
+            path: file.path,
+            name: file.uri.pathSegments.last,
+            extension: _openService.extensionOf(file.path),
+            content: file.path == _activeFile.path ? _activeFile.content : '',
+            projectRoot: root,
+          ),
+        )
+        .toList(growable: false);
+    notifyListeners();
+  }
+
+  Future<void> createFile(String fileName) async {
+    if (_disposed) return;
+    final root = _activeFile.projectRoot;
+    if (root == null) return;
+
+    final path = '$root${Platform.pathSeparator}$fileName';
+    final file = File(path);
+    if (await file.exists()) return;
+
+    await file.create(recursive: true);
+    await _refreshProjectFiles();
+  }
+
+  Future<void> deleteFile(WhiskFile whiskFile) async {
+    if (_disposed) return;
+    final file = File(whiskFile.path);
+    if (await file.exists()) {
+      await file.delete();
+    }
+
+    _openFiles = _openFiles.where((f) => f.path != whiskFile.path).toList();
+
+    if (_activeFile.path == whiskFile.path) {
+      if (_openFiles.isNotEmpty) {
+        _activeFile = _openFiles.first;
+      } else {
+        await _refreshProjectFiles();
+        if (_projectFiles.isNotEmpty) {
+          final firstRemaining = _projectFiles.firstWhere(
+            (f) => f.path != whiskFile.path,
+            orElse: () => _projectFiles.first,
+          );
+          _activeFile = firstRemaining;
+        }
+      }
+    }
+
+    await _refreshProjectFiles();
   }
 
   void _replaceFileInLists(WhiskFile replacement) {

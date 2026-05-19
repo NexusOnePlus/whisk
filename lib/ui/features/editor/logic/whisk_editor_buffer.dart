@@ -95,13 +95,69 @@ class WhiskEditorBuffer {
     final safeStart = start.clamp(0, _text.length);
     final safeEnd = end.clamp(safeStart, _text.length);
     final deleted = _text.substring(safeStart, safeEnd);
+    
     _replacePieces(safeStart, safeEnd, text);
-    _rebuildMaterializedState();
+    _text = _text.replaceRange(safeStart, safeEnd, text);
+    
+    _updateLineStartsIncremental(
+      offset: safeStart,
+      deletedLength: deleted.length,
+      insertedText: text,
+    );
+    
     return EditorTextOperation(
       offset: safeStart,
       deletedText: deleted,
       insertedText: text,
     );
+  }
+
+  void _updateLineStartsIncremental({
+    required int offset,
+    required int deletedLength,
+    required String insertedText,
+  }) {
+    final oldEnd = offset + deletedLength;
+    final delta = insertedText.length - deletedLength;
+
+    final newStarts = <int>[];
+    
+    // 1. Keep line starts before and at the edit offset
+    for (final start in _lineStarts) {
+      if (start <= offset) {
+        newStarts.add(start);
+      }
+    }
+
+    // 2. Scan the inserted text for newlines
+    for (var i = 0; i < insertedText.length; i++) {
+      if (insertedText.codeUnitAt(i) == 10) {
+        newStarts.add(offset + i + 1);
+      }
+    }
+
+    // 3. Keep line starts after the edit, shifted by delta
+    for (final start in _lineStarts) {
+      if (start > oldEnd) {
+        newStarts.add(start + delta);
+      }
+    }
+
+    _lineStarts = newStarts;
+    if (_lineStarts.isEmpty || _lineStarts[0] != 0) {
+      _lineStarts.insert(0, 0);
+    }
+  }
+
+  void replaceBatch(List<({int start, int end, String text})> edits) {
+    final ordered = [...edits]..sort((a, b) => b.start.compareTo(a.start));
+    for (final edit in ordered) {
+      final currentLength = _pieceLength;
+      final safeStart = edit.start.clamp(0, currentLength);
+      final safeEnd = edit.end.clamp(safeStart, currentLength);
+      _replacePieces(safeStart, safeEnd, edit.text);
+    }
+    _rebuildMaterializedState();
   }
 
   void apply(EditorTextOperation operation) {
@@ -121,7 +177,7 @@ class WhiskEditorBuffer {
 
   void _replacePieces(int start, int end, String insertedText) {
     final before = _slicePieces(0, start);
-    final after = _slicePieces(end, length);
+    final after = _slicePieces(end, _pieceLength);
     final inserted = <_TextPiece>[];
     if (insertedText.isNotEmpty) {
       final addStart = _addBuffer.length;
@@ -129,6 +185,14 @@ class WhiskEditorBuffer {
       inserted.add(_TextPiece.add(addStart, insertedText.length));
     }
     _pieces = [...before, ...inserted, ...after];
+  }
+
+  int get _pieceLength {
+    var total = 0;
+    for (final piece in _pieces) {
+      total += piece.length;
+    }
+    return total;
   }
 
   List<_TextPiece> _slicePieces(int start, int end) {

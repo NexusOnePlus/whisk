@@ -3,13 +3,15 @@ import 'package:whisk/ui/features/editor/logic/syntax_highlighter.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_buffer.dart';
 import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
 import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
+import 'package:whisk/ui/features/editor/models/editor_text_position.dart';
 
 class WhiskEditorController extends TextEditingController {
   WhiskEditorController({
     required String text,
     required this.environmentId,
-    this.highlighter = const SyntaxHighlighter(),
+    SyntaxHighlighter? highlighter,
   }) : buffer = WhiskEditorBuffer(text),
+       highlighter = highlighter ?? SyntaxHighlighter(),
        super(text: text);
 
   final WhiskEditorBuffer buffer;
@@ -23,23 +25,50 @@ class WhiskEditorController extends TextEditingController {
   var _applyingHistory = false;
   var _syncingFromModel = false;
   var _applyingCursors = false;
+  String? _textBeforeComposition;
+  TextSelection? _selectionBeforeComposition;
 
   @override
   set value(TextEditingValue newValue) {
     final oldValue = value;
     final oldText = text;
+    final isComposing =
+        newValue.composing.isValid && !newValue.composing.isCollapsed;
+    
+    EditorTextOperation? operation;
+    
     if (!_applyingHistory && !_syncingFromModel && !_applyingCursors) {
+      if (isComposing) {
+        _textBeforeComposition ??= oldText;
+        _selectionBeforeComposition ??= oldValue.selection;
+      } else if (_textBeforeComposition != null) {
+        // Composition just finished
+        final finalText = newValue.text;
+        final op = _operationFromDiff(_textBeforeComposition!, finalText);
+        if (op != null && activeCursors.isNotEmpty) {
+          _applyWithCursors(
+            primaryDelta: op,
+            oldPrimarySelection: _selectionBeforeComposition!,
+          );
+          _textBeforeComposition = null;
+          _selectionBeforeComposition = null;
+          return;
+        }
+        _textBeforeComposition = null;
+        _selectionBeforeComposition = null;
+      }
+ 
       if (oldText != newValue.text) {
-        final operation = _operationFromDiff(oldText, newValue.text);
-        if (operation != null) {
-          if (activeCursors.isNotEmpty && oldValue.selection.isCollapsed) {
+        operation = _operationFromDiff(oldText, newValue.text);
+        if (operation != null && !isComposing) {
+          if (activeCursors.isNotEmpty) {
             _applyWithCursors(
               primaryDelta: operation,
-              oldPrimaryOffset: oldValue.selection.extentOffset,
+              oldPrimarySelection: oldValue.selection,
             );
             return;
           }
-          _undoStack.add(
+          _pushUndo(
             EditorTextTransaction.single(
               operation: operation,
               selectionOffsetBefore: oldValue.selection.extentOffset.clamp(
@@ -56,10 +85,16 @@ class WhiskEditorController extends TextEditingController {
         }
       }
     }
-    super.value = newValue;
+    
     if (oldText != newValue.text) {
-      buffer.setText(newValue.text);
+      if (!_applyingHistory && !_syncingFromModel && !_applyingCursors && operation != null) {
+        buffer.apply(operation);
+      } else {
+        buffer.setText(newValue.text);
+      }
     }
+
+    super.value = newValue;
   }
 
   void setEnvironment(String id) {
@@ -98,8 +133,8 @@ class WhiskEditorController extends TextEditingController {
         operation: operation,
         selectionOffsetBefore: oldSelectionOffset,
         selectionOffsetAfter: newSelectionOffset,
-        cursorOffsetsBefore: _cursorOffsets,
-        cursorOffsetsAfter: const [],
+        cursorRangesBefore: activeCursors,
+        cursorRangesAfter: const [],
       ),
     );
     _redoStack.clear();
@@ -134,56 +169,133 @@ class WhiskEditorController extends TextEditingController {
     notifyListeners();
   }
 
+  void setActiveSelections(List<EditorSelectionRange> selections) {
+    activeCursors = List.unmodifiable(selections);
+    notifyListeners();
+  }
+
+  void selectAll() {
+    activeCursors = const [];
+    value = value.copyWith(
+      selection: TextSelection(baseOffset: 0, extentOffset: text.length),
+      composing: TextRange.empty,
+    );
+    notifyListeners();
+  }
+
+  void moveSelections(
+    EditorMoveDirection direction, {
+    required bool expand,
+    required bool byWord,
+  }) {
+    final primary = EditorSelectionRange(
+      baseOffset: selection.baseOffset,
+      extentOffset: selection.extentOffset,
+    );
+    final movedPrimary = _moveRange(
+      primary,
+      direction: direction,
+      expand: expand,
+      byWord: byWord,
+    );
+    final movedCursors = [
+      for (final cursor in activeCursors)
+        _moveRange(
+          cursor,
+          direction: direction,
+          expand: expand,
+          byWord: byWord,
+        ),
+    ];
+
+    activeCursors = List.unmodifiable(movedCursors);
+    value = value.copyWith(
+      selection: TextSelection(
+        baseOffset: movedPrimary.baseOffset.clamp(0, text.length),
+        extentOffset: movedPrimary.extentOffset.clamp(0, text.length),
+        affinity: _affinityForOffset(movedPrimary.extentOffset),
+      ),
+      composing: TextRange.empty,
+    );
+    notifyListeners();
+  }
+
   void _applyWithCursors({
     required EditorTextOperation primaryDelta,
-    required int oldPrimaryOffset,
+    required TextSelection oldPrimarySelection,
   }) {
     _applyingCursors = true;
     try {
-      final relativeEditStart = primaryDelta.offset - oldPrimaryOffset;
-      final cursorOrigins = <int>{
-        for (final c in activeCursors) c.baseOffset,
-        oldPrimaryOffset,
-      }.toList()..sort();
-      final editStarts =
-          cursorOrigins
-              .map((offset) => offset + relativeEditStart)
-              .map((offset) => offset.clamp(0, buffer.length))
-              .toSet()
-              .toList()
-            ..sort();
-      final edits = <_CursorEdit>[
-        for (final offset in editStarts)
-          _CursorEdit(offset: offset, length: primaryDelta.deletedText.length),
-      ];
-      edits.sort((a, b) => b.offset.compareTo(a.offset));
+      final primaryRange = EditorSelectionRange(
+        baseOffset: oldPrimarySelection.baseOffset,
+        extentOffset: oldPrimarySelection.extentOffset,
+      );
+      final relativeEditStart = primaryDelta.offset - primaryRange.start;
+      final editRanges = <_CursorEdit>[
+        _editForRange(primaryRange, primaryDelta, relativeEditStart),
+        for (final cursor in activeCursors)
+          _editForRange(cursor, primaryDelta, relativeEditStart),
+      ]..sort((a, b) => b.offset.compareTo(a.offset));
+      final uniqueEditRanges = <_CursorEdit>[];
+      for (final edit in editRanges) {
+        final overlapsExisting = uniqueEditRanges.any(
+          (existing) =>
+              edit.offset < existing.offset + existing.length &&
+              existing.offset < edit.offset + edit.length,
+        );
+        if (!overlapsExisting) uniqueEditRanges.add(edit);
+      }
+      final edits = <_CursorEdit>[for (final edit in uniqueEditRanges) edit];
 
-      final operations = <EditorTextOperation>[];
-      for (final edit in edits) {
-        operations.add(
-          buffer.replace(
+      final batchEdits = <({int start, int end, String text, String deleted})>[
+        for (final edit in edits)
+          (
             start: edit.offset,
             end: edit.offset + edit.length,
             text: primaryDelta.insertedText,
+            deleted: buffer.text.substring(
+              edit.offset,
+              (edit.offset + edit.length).clamp(0, buffer.length),
+            ),
           ),
-        );
-      }
+      ];
+      buffer.replaceBatch([
+        for (final e in batchEdits) (start: e.start, end: e.end, text: e.text),
+      ]);
+      final operations = [
+        for (final e in batchEdits)
+          EditorTextOperation(
+            offset: e.start,
+            deletedText: e.deleted,
+            insertedText: primaryDelta.insertedText,
+          ),
+      ];
 
-      final delta =
-          primaryDelta.insertedText.length - primaryDelta.deletedText.length;
-      int transformedOffset(int offset) {
-        var shifted = offset + primaryDelta.insertedText.length;
-        for (final editOffset in editStarts) {
-          if (editOffset >= offset) break;
-          shifted += delta;
+      int transformedOffsetForEdit(_CursorEdit currentEdit) {
+        var shifted = currentEdit.offset + primaryDelta.insertedText.length;
+        for (final edit in uniqueEditRanges.reversed) {
+          if (edit.offset >= currentEdit.offset) continue;
+          shifted += primaryDelta.insertedText.length - edit.length;
         }
         return shifted.clamp(0, buffer.length);
       }
 
-      final primaryOffset = transformedOffset(oldPrimaryOffset);
+      final primaryEdit = _editForRange(
+        primaryRange,
+        primaryDelta,
+        relativeEditStart,
+      );
+      final primaryOffset = transformedOffsetForEdit(primaryEdit);
       final newCursors = activeCursors
-          .where((cursor) => cursor.baseOffset != oldPrimaryOffset)
-          .map((cursor) => transformedOffset(cursor.baseOffset))
+          .map(
+            (cursor) => _editForRange(cursor, primaryDelta, relativeEditStart),
+          )
+          .where(
+            (edit) =>
+                edit.offset != primaryEdit.offset ||
+                edit.length != primaryEdit.length,
+          )
+          .map(transformedOffsetForEdit)
           .map((o) => EditorSelectionRange(baseOffset: o, extentOffset: o))
           .toList();
       newCursors.sort((a, b) => a.baseOffset.compareTo(b.baseOffset));
@@ -196,15 +308,16 @@ class WhiskEditorController extends TextEditingController {
         composing: TextRange.empty,
       );
 
-      _undoStack.add(
+      _pushUndo(
         EditorTextTransaction(
           operations: operations,
-          selectionOffsetBefore: oldPrimaryOffset.clamp(0, text.length),
+          selectionOffsetBefore: primaryRange.extentOffset.clamp(
+            0,
+            text.length,
+          ),
           selectionOffsetAfter: primaryOffset,
-          cursorOffsetsBefore: _cursorOffsets,
-          cursorOffsetsAfter: [
-            for (final cursor in newCursors) cursor.baseOffset,
-          ],
+          cursorRangesBefore: activeCursors,
+          cursorRangesAfter: newCursors,
         ),
       );
       _redoStack.clear();
@@ -215,6 +328,21 @@ class WhiskEditorController extends TextEditingController {
     }
   }
 
+  _CursorEdit _editForRange(
+    EditorSelectionRange range,
+    EditorTextOperation primaryDelta,
+    int relativeEditStart,
+  ) {
+    if (!range.isCollapsed) {
+      return _CursorEdit(offset: range.start, length: range.end - range.start);
+    }
+    final offset = (range.baseOffset + relativeEditStart).clamp(
+      0,
+      buffer.length,
+    );
+    return _CursorEdit(offset: offset, length: primaryDelta.deletedText.length);
+  }
+
   bool undoEdit() {
     if (_undoStack.isEmpty) return false;
     final transaction = _undoStack.removeLast();
@@ -222,7 +350,7 @@ class WhiskEditorController extends TextEditingController {
     _redoStack.add(transaction);
     _setValueFromBuffer(
       selectionOffset: transaction.selectionOffsetBefore,
-      cursorOffsets: transaction.cursorOffsetsBefore,
+      cursorRanges: transaction.cursorRangesBefore,
     );
     return true;
   }
@@ -234,7 +362,7 @@ class WhiskEditorController extends TextEditingController {
     _undoStack.add(transaction);
     _setValueFromBuffer(
       selectionOffset: transaction.selectionOffsetAfter,
-      cursorOffsets: transaction.cursorOffsetsAfter,
+      cursorRanges: transaction.cursorRangesAfter,
     );
     return true;
   }
@@ -249,15 +377,15 @@ class WhiskEditorController extends TextEditingController {
 
   void _setValueFromBuffer({
     required int selectionOffset,
-    List<int> cursorOffsets = const [],
+    List<EditorSelectionRange> cursorRanges = const [],
   }) {
     _applyingHistory = true;
     try {
       activeCursors = [
-        for (final offset in cursorOffsets)
+        for (final range in cursorRanges)
           EditorSelectionRange(
-            baseOffset: offset.clamp(0, buffer.length),
-            extentOffset: offset.clamp(0, buffer.length),
+            baseOffset: range.baseOffset.clamp(0, buffer.length),
+            extentOffset: range.extentOffset.clamp(0, buffer.length),
           ),
       ];
       value = value.copyWith(
@@ -272,9 +400,106 @@ class WhiskEditorController extends TextEditingController {
     }
   }
 
-  List<int> get _cursorOffsets => [
-    for (final cursor in activeCursors) cursor.baseOffset,
-  ];
+  void _pushUndo(EditorTextTransaction transaction) {
+    if (_undoStack.isNotEmpty && _undoStack.last.canMergeWith(transaction)) {
+      _undoStack[_undoStack.length - 1] = _undoStack.last.mergeWith(
+        transaction,
+      );
+      return;
+    }
+    _undoStack.add(transaction);
+  }
+
+  EditorSelectionRange _moveRange(
+    EditorSelectionRange range, {
+    required EditorMoveDirection direction,
+    required bool expand,
+    required bool byWord,
+  }) {
+    final origin = range.extentOffset.clamp(0, text.length);
+    final target = _moveOffset(origin, direction: direction, byWord: byWord);
+    if (expand) {
+      return EditorSelectionRange(
+        baseOffset: range.baseOffset.clamp(0, text.length),
+        extentOffset: target,
+      );
+    }
+    return EditorSelectionRange(baseOffset: target, extentOffset: target);
+  }
+
+  int _moveOffset(
+    int offset, {
+    required EditorMoveDirection direction,
+    required bool byWord,
+  }) {
+    return switch (direction) {
+      EditorMoveDirection.left =>
+        byWord
+            ? _previousWordBoundary(offset)
+            : (offset - 1).clamp(0, text.length),
+      EditorMoveDirection.right =>
+        byWord ? _nextWordBoundary(offset) : (offset + 1).clamp(0, text.length),
+      EditorMoveDirection.up => _verticalOffset(offset, -1),
+      EditorMoveDirection.down => _verticalOffset(offset, 1),
+      EditorMoveDirection.home => _lineBoundary(offset, start: true),
+      EditorMoveDirection.end => _lineBoundary(offset, start: false),
+      EditorMoveDirection.pageUp => _verticalOffset(offset, -25),
+      EditorMoveDirection.pageDown => _verticalOffset(offset, 25),
+    };
+  }
+
+  int _lineBoundary(int offset, {required bool start}) {
+    final position = buffer.positionForOffset(offset);
+    if (start) {
+      return buffer.lineStarts[position.line];
+    } else {
+      return buffer.lineStarts[position.line] + buffer.lineText(position.line).length;
+    }
+  }
+
+  int _verticalOffset(int offset, int lineDelta) {
+    final position = buffer.positionForOffset(offset);
+    return buffer.offsetForPosition(
+      EditorTextPosition(
+        line: position.line + lineDelta,
+        column: position.column,
+      ),
+    );
+  }
+
+  int _previousWordBoundary(int offset) {
+    var cursor = offset.clamp(0, text.length);
+    while (cursor > 0 && _isWhitespace(text.codeUnitAt(cursor - 1))) {
+      cursor--;
+    }
+    while (cursor > 0 && !_isWhitespace(text.codeUnitAt(cursor - 1))) {
+      cursor--;
+    }
+    return cursor;
+  }
+
+  int _nextWordBoundary(int offset) {
+    var cursor = offset.clamp(0, text.length);
+    while (cursor < text.length && !_isWhitespace(text.codeUnitAt(cursor))) {
+      cursor++;
+    }
+    while (cursor < text.length && _isWhitespace(text.codeUnitAt(cursor))) {
+      cursor++;
+    }
+    return cursor;
+  }
+
+  bool _isWhitespace(int codeUnit) {
+    return codeUnit == 9 || codeUnit == 10 || codeUnit == 13 || codeUnit == 32;
+  }
+
+  TextAffinity _affinityForOffset(int offset) {
+    final clamped = offset.clamp(0, text.length);
+    if (clamped < text.length && text.codeUnitAt(clamped) == 10) {
+      return TextAffinity.upstream;
+    }
+    return TextAffinity.downstream;
+  }
 
   EditorTextOperation? _operationFromDiff(String oldText, String newText) {
     if (oldText == newText) return null;
@@ -311,10 +536,9 @@ class WhiskEditorController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
-    return highlighter.highlight(
+    return TextSpan(
       text: text,
-      environmentId: environmentId,
-      baseStyle: style ?? const TextStyle(),
+      style: style,
     );
   }
 }
@@ -324,3 +548,5 @@ class _CursorEdit {
   final int offset;
   final int length;
 }
+
+enum EditorMoveDirection { left, right, up, down, home, end, pageUp, pageDown }

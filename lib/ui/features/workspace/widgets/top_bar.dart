@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
+import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 class TopBar extends StatelessWidget {
@@ -21,73 +22,77 @@ class TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.fromLTRB(10, 4, 156, 4),
-      decoration: const BoxDecoration(
-        color: kPanel,
-        border: Border(bottom: BorderSide(color: kBorder)),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: 'Close workspace',
-            onPressed: onCloseWorkspace,
-            icon: const Icon(Icons.arrow_back),
-            color: kTextSecondary,
-            iconSize: 20,
-            constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-            padding: EdgeInsets.zero,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: openFiles.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final tabFile = openFiles[index];
-                final active = tabFile.path == file.path;
-                return _FileTabPill(
-                  icon: _iconFor(tabFile),
-                  label: tabFile.isDirty ? '${tabFile.name} *' : tabFile.name,
-                  active: active,
-                  accent: active ? kAccentBlue : null,
-                  onTap: () => onSelectFile(tabFile),
-                );
-              },
+    return GlassPanel(
+      borderRadius: 0,
+      opacity: 0.8,
+      blur: 32,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.fromLTRB(10, 4, 156, 4),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: kBorder)),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: 'Close workspace',
+              onPressed: onCloseWorkspace,
+              icon: const Icon(Icons.arrow_back),
+              color: kTextSecondary,
+              iconSize: 20,
+              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+              padding: EdgeInsets.zero,
             ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'New tab',
-            onPressed: () {},
-            icon: const Icon(Icons.add),
-            color: kTextSecondary,
-            iconSize: 19,
-            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-            padding: EdgeInsets.zero,
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'Split layout',
-            onPressed: () {},
-            icon: const Icon(Icons.view_column_outlined),
-            color: kTextSecondary,
-            iconSize: 19,
-            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-            padding: EdgeInsets.zero,
-          ),
-          IconButton(
-            tooltip: 'More',
-            onPressed: () {},
-            icon: const Icon(Icons.more_horiz),
-            color: kTextSecondary,
-            iconSize: 19,
-            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-            padding: EdgeInsets.zero,
-          ),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: openFiles.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final tabFile = openFiles[index];
+                  final active = tabFile.path == file.path;
+                  return _FileTabPill(
+                    icon: _iconFor(tabFile),
+                    label: tabFile.isDirty ? '${tabFile.name} *' : tabFile.name,
+                    active: active,
+                    accent: active ? kAccentBlue : null,
+                    onTap: () => onSelectFile(tabFile),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'New tab',
+              onPressed: () {},
+              icon: const Icon(Icons.add),
+              color: kTextSecondary,
+              iconSize: 19,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Split layout',
+              onPressed: () {},
+              icon: const Icon(Icons.view_column_outlined),
+              color: kTextSecondary,
+              iconSize: 19,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+            ),
+            IconButton(
+              tooltip: 'More',
+              onPressed: () {},
+              icon: const Icon(Icons.more_horiz),
+              color: kTextSecondary,
+              iconSize: 19,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -130,14 +135,14 @@ class _FileTabPill extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 180),
         padding: const EdgeInsets.symmetric(horizontal: 9),
         decoration: BoxDecoration(
-          color: active ? kPanelRaised : kAppBlack,
+          color: active ? kGlassHighlight : kAppBlack.withOpacity(0.4),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: active ? (accent ?? kBorder) : kBorder),
           gradient: active
               ? LinearGradient(
                   colors: [
                     (accent ?? kAccentBlue).withValues(alpha: 0.22),
-                    kPanelRaised,
+                    kGlassBase,
                   ],
                 )
               : null,

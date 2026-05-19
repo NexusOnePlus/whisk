@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
+import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
 import 'package:whisk/ui/features/editor/models/editor_text_position.dart';
 
 class SourcePane extends StatefulWidget {
@@ -96,7 +97,6 @@ class _SourcePaneState extends State<SourcePane> {
             widget.controller.text,
             editorViewportWidth,
           );
-          final totalContentWidth = gutterWidth + 1 + editorContentWidth;
           _viewportHeight = constraints.maxHeight - 12;
           _viewportWidth = editorViewportWidth;
 
@@ -111,47 +111,51 @@ class _SourcePaneState extends State<SourcePane> {
                 interactive: true,
                 notificationPredicate: (notification) =>
                     notification.metrics.axis == Axis.vertical,
-                child: Scrollbar(
-                  controller: _horizontalScrollController,
-                  thumbVisibility: true,
-                  trackVisibility: true,
-                  interactive: true,
-                  scrollbarOrientation: ScrollbarOrientation.bottom,
-                  notificationPredicate: (notification) =>
-                      notification.metrics.axis == Axis.horizontal,
-                  child: SingleChildScrollView(
-                    controller: _horizontalScrollController,
-                    physics: const ClampingScrollPhysics(),
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: totalContentWidth,
-                      height: constraints.maxHeight,
-                      child: SingleChildScrollView(
-                        controller: _verticalScrollController,
-                        physics: const ClampingScrollPhysics(),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _LineGutter(
-                              controller: widget.controller,
-                              style: _style,
-                            ),
-                            const SizedBox(
-                              width: 1,
-                              child: ColoredBox(color: kBorder),
-                            ),
-                            _EditorStack(
+                child: SingleChildScrollView(
+                  controller: _verticalScrollController,
+                  physics: const ClampingScrollPhysics(),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ExcludeSemantics(
+                        child: _LineGutter(
+                          controller: widget.controller,
+                          scrollController: _verticalScrollController,
+                          style: _style,
+                          viewportHeight: _viewportHeight,
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 1,
+                        child: ColoredBox(color: kBorder),
+                      ),
+                      SizedBox(
+                        width: editorViewportWidth,
+                        child: Scrollbar(
+                          controller: _horizontalScrollController,
+                          thumbVisibility: true,
+                          trackVisibility: true,
+                          interactive: true,
+                          scrollbarOrientation: ScrollbarOrientation.bottom,
+                          notificationPredicate: (notification) =>
+                              notification.metrics.axis == Axis.horizontal,
+                          child: SingleChildScrollView(
+                            controller: _horizontalScrollController,
+                            physics: const ClampingScrollPhysics(),
+                            scrollDirection: Axis.horizontal,
+                            child: _EditorStack(
                               controller: widget.controller,
                               focusNode: widget.focusNode,
+                              scrollController: _verticalScrollController,
                               style: _style,
                               contentWidth: editorContentWidth,
                               viewportHeight: _viewportHeight,
                               onChanged: widget.onChanged,
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -240,6 +244,7 @@ class _EditorStack extends StatefulWidget {
   const _EditorStack({
     required this.controller,
     required this.focusNode,
+    required this.scrollController,
     required this.style,
     required this.contentWidth,
     required this.viewportHeight,
@@ -248,6 +253,7 @@ class _EditorStack extends StatefulWidget {
 
   final WhiskEditorController controller;
   final FocusNode focusNode;
+  final ScrollController scrollController;
   final TextStyle style;
   final double contentWidth;
   final double viewportHeight;
@@ -265,9 +271,26 @@ class _RedoIntent extends Intent {
   const _RedoIntent();
 }
 
+class _SelectAllIntent extends Intent {
+  const _SelectAllIntent();
+}
+
+class _MoveSelectionIntent extends Intent {
+  const _MoveSelectionIntent({
+    required this.direction,
+    this.expand = false,
+    this.byWord = false,
+  });
+
+  final EditorMoveDirection direction;
+  final bool expand;
+  final bool byWord;
+}
+
 class _EditorStackState extends State<_EditorStack> {
   int? _dragAnchorOffset;
   bool _isMouseSelecting = false;
+  bool _isAdditiveSelection = false;
 
   @override
   Widget build(BuildContext context) {
@@ -284,6 +307,95 @@ class _EditorStackState extends State<_EditorStack> {
             const _RedoIntent(),
         SingleActivator(LogicalKeyboardKey.keyY, control: true):
             const _RedoIntent(),
+        SingleActivator(LogicalKeyboardKey.arrowLeft):
+            const _MoveSelectionIntent(direction: EditorMoveDirection.left),
+        SingleActivator(LogicalKeyboardKey.arrowRight):
+            const _MoveSelectionIntent(direction: EditorMoveDirection.right),
+        SingleActivator(LogicalKeyboardKey.arrowUp): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.up,
+        ),
+        SingleActivator(LogicalKeyboardKey.arrowDown):
+            const _MoveSelectionIntent(direction: EditorMoveDirection.down),
+        SingleActivator(
+          LogicalKeyboardKey.arrowLeft,
+          shift: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.left,
+          expand: true,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.arrowRight,
+          shift: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.right,
+          expand: true,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.arrowUp,
+          shift: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.up,
+          expand: true,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.arrowDown,
+          shift: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.down,
+          expand: true,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.arrowLeft,
+          control: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.left,
+          byWord: true,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.arrowRight,
+          control: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.right,
+          byWord: true,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.arrowLeft,
+          control: true,
+          shift: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.left,
+          expand: true,
+          byWord: true,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.arrowRight,
+          control: true,
+          shift: true,
+        ): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.right,
+          byWord: true,
+          expand: true,
+        ),
+        SingleActivator(LogicalKeyboardKey.home):
+            const _MoveSelectionIntent(direction: EditorMoveDirection.home),
+        SingleActivator(LogicalKeyboardKey.end):
+            const _MoveSelectionIntent(direction: EditorMoveDirection.end),
+        SingleActivator(LogicalKeyboardKey.home, shift: true):
+            const _MoveSelectionIntent(
+          direction: EditorMoveDirection.home,
+          expand: true,
+        ),
+        SingleActivator(LogicalKeyboardKey.end, shift: true):
+            const _MoveSelectionIntent(
+          direction: EditorMoveDirection.end,
+          expand: true,
+        ),
+        SingleActivator(LogicalKeyboardKey.pageUp):
+            const _MoveSelectionIntent(direction: EditorMoveDirection.pageUp),
+        SingleActivator(LogicalKeyboardKey.pageDown):
+            const _MoveSelectionIntent(direction: EditorMoveDirection.pageDown),
+        SingleActivator(LogicalKeyboardKey.keyA, control: true):
+            const _SelectAllIntent(),
       },
       child: Actions(
         actions: {
@@ -293,64 +405,315 @@ class _EditorStackState extends State<_EditorStack> {
           _RedoIntent: CallbackAction<_RedoIntent>(
             onInvoke: (_) => widget.controller.redoEdit(),
           ),
+          _MoveSelectionIntent: CallbackAction<_MoveSelectionIntent>(
+            onInvoke: (intent) => widget.controller.moveSelections(
+              intent.direction,
+              expand: intent.expand,
+              byWord: intent.byWord,
+            ),
+          ),
+          _SelectAllIntent: CallbackAction<_SelectAllIntent>(
+            onInvoke: (_) => widget.controller.selectAll(),
+          ),
         },
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onDoubleTapDown: _handleDoubleTapDown,
-          child: Listener(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.text,
+          child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onPointerDown: _handlePointerDown,
-            onPointerMove: _handlePointerMove,
-            onPointerUp: _handlePointerUp,
-            onPointerCancel: (_) => _stopSelecting(),
-            child: SizedBox(
-              width: widget.contentWidth,
-              height: contentHeight,
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 24, 24),
-                    child: IgnorePointer(
-                      child: EditableText(
-                        controller: widget.controller,
-                        focusNode: widget.focusNode,
-                        style: widget.style,
-                        strutStyle: _SourcePaneState._strutStyle,
-                        cursorColor: Colors.transparent,
-                        backgroundCursorColor: kTextMuted,
-                        selectionColor: Colors.transparent,
-                        selectionControls: materialTextSelectionControls,
-                        keyboardType: TextInputType.multiline,
-                        textInputAction: TextInputAction.newline,
-                        maxLines: null,
-                        minLines: null,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        scrollPhysics: const NeverScrollableScrollPhysics(),
-                        onChanged: widget.onChanged,
-                      ),
+            onDoubleTapDown: _handleDoubleTapDown,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: _handlePointerDown,
+              onPointerMove: _handlePointerMove,
+              onPointerUp: _handlePointerUp,
+              onPointerCancel: (_) => _stopSelecting(),
+              child: SizedBox(
+                width: widget.contentWidth,
+                height: contentHeight,
+                child: Stack(
+                  children: [
+                    // Lightweight IME bridge: handles character input directly
+                    // instead of using EditableText (which serialized the entire
+                    // document as JSON to the platform on every keystroke).
+                    Focus(
+                      focusNode: widget.focusNode,
+                      onKeyEvent: _handleKeyEvent,
+                      child: const SizedBox.shrink(),
                     ),
-                  ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 16, 24, 24),
-                        child: CustomPaint(
-                          painter: _EditorOverlayPainter(
-                            controller: widget.controller,
-                            style: widget.style,
+                    Positioned.fill(
+                      child: ExcludeSemantics(
+                        child: IgnorePointer(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 16, 24, 24),
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([
+                                widget.scrollController,
+                                widget.controller,
+                              ]),
+                              builder: (context, _) {
+                                final lineHeight = (widget.style.fontSize ?? 14) *
+                                    (widget.style.height ?? 1.45);
+                                final scrollOffset = widget.scrollController.hasClients
+                                    ? widget.scrollController.offset
+                                    : 0.0;
+                                final firstLine = (scrollOffset / lineHeight)
+                                    .floor()
+                                    .clamp(
+                                      0,
+                                      widget.controller.buffer.lineCount - 1,
+                                    );
+                                final lastLine =
+                                    ((scrollOffset + widget.viewportHeight) /
+                                            lineHeight)
+                                        .ceil()
+                                        .clamp(
+                                          0,
+                                          widget.controller.buffer.lineCount - 1,
+                                        );
+    
+                                final lineWidgets = <Widget>[];
+                                for (var line = firstLine; line <= lastLine; line++) {
+                                  final lineText = widget.controller.buffer.lineText(line);
+                                  final span = widget.controller.highlighter.highlight(
+                                    text: lineText,
+                                    environmentId: widget.controller.environmentId,
+                                    baseStyle: widget.style,
+                                  );
+                                  lineWidgets.add(
+                                    Positioned(
+                                      top: line * lineHeight,
+                                      left: 0,
+                                      right: 0,
+                                      height: lineHeight,
+                                      child: RichText(
+                                        text: span,
+                                        textDirection: TextDirection.ltr,
+                                      ),
+                                    ),
+                                  );
+                                }
+    
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    ...lineWidgets,
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: _EditorOverlayPainter(
+                                          controller: widget.controller,
+                                          style: widget.style,
+                                          visibleRange: (
+                                            firstLine: firstLine,
+                                            lastLine: lastLine
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final isCtrl = HardwareKeyboard.instance.isControlPressed;
+    final isAlt = HardwareKeyboard.instance.isAltPressed;
+
+    // Let Shortcuts widget handle these (undo/redo, arrows, home/end, select all)
+    final key = event.logicalKey;
+    if (isCtrl && key == LogicalKeyboardKey.keyZ) {
+      return KeyEventResult.ignored;
+    }
+    if (isCtrl && key == LogicalKeyboardKey.keyY) {
+      return KeyEventResult.ignored;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.home ||
+        key == LogicalKeyboardKey.end ||
+        key == LogicalKeyboardKey.pageUp ||
+        key == LogicalKeyboardKey.pageDown) {
+      return KeyEventResult.ignored;
+    }
+    if (isCtrl && key == LogicalKeyboardKey.keyA) {
+      return KeyEventResult.ignored;
+    }
+
+    // Copy
+    if (isCtrl && key == LogicalKeyboardKey.keyC) {
+      _handleCopy();
+      return KeyEventResult.handled;
+    }
+    // Cut
+    if (isCtrl && key == LogicalKeyboardKey.keyX) {
+      _handleCut();
+      return KeyEventResult.handled;
+    }
+    // Paste
+    if (isCtrl && key == LogicalKeyboardKey.keyV) {
+      _handlePaste();
+      return KeyEventResult.handled;
+    }
+
+    // Enter
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      _insertText('\n');
+      return KeyEventResult.handled;
+    }
+
+    // Tab
+    if (key == LogicalKeyboardKey.tab) {
+      _insertText('  ');
+      return KeyEventResult.handled;
+    }
+
+    // Backspace
+    if (key == LogicalKeyboardKey.backspace) {
+      _handleBackspace(byWord: isCtrl);
+      return KeyEventResult.handled;
+    }
+
+    // Delete
+    if (key == LogicalKeyboardKey.delete) {
+      _handleDelete(byWord: isCtrl);
+      return KeyEventResult.handled;
+    }
+
+    // Character input
+    if (event.character != null && !isCtrl && !isAlt) {
+      final ch = event.character!;
+      if (ch.isNotEmpty && ch.codeUnitAt(0) >= 32) {
+        _insertText(ch);
+        return KeyEventResult.handled;
+      }
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  void _insertText(String text) {
+    final sel = widget.controller.selection;
+    final start = sel.start.clamp(0, widget.controller.text.length);
+    final end = sel.end.clamp(0, widget.controller.text.length);
+    widget.controller.replaceRange(
+      start: start,
+      end: end,
+      replacement: text,
+    );
+    widget.onChanged(widget.controller.text);
+  }
+
+  void _handleBackspace({required bool byWord}) {
+    final sel = widget.controller.selection;
+    if (sel.start != sel.end) {
+      _insertText('');
+    } else if (sel.start > 0) {
+      int deleteStart;
+      if (byWord) {
+        deleteStart = _previousWordBoundary(sel.start);
+      } else {
+        deleteStart = sel.start - 1;
+      }
+      widget.controller.replaceRange(
+        start: deleteStart,
+        end: sel.start,
+        replacement: '',
+      );
+      widget.onChanged(widget.controller.text);
+    }
+  }
+
+  void _handleDelete({required bool byWord}) {
+    final sel = widget.controller.selection;
+    if (sel.start != sel.end) {
+      _insertText('');
+    } else if (sel.start < widget.controller.text.length) {
+      int deleteEnd;
+      if (byWord) {
+        deleteEnd = _nextWordBoundary(sel.start);
+      } else {
+        deleteEnd = sel.start + 1;
+      }
+      widget.controller.replaceRange(
+        start: sel.start,
+        end: deleteEnd,
+        replacement: '',
+      );
+      widget.onChanged(widget.controller.text);
+    }
+  }
+
+  int _previousWordBoundary(int offset) {
+    final text = widget.controller.text;
+    var cursor = offset.clamp(0, text.length);
+    while (cursor > 0 && _isSpace(text.codeUnitAt(cursor - 1))) {
+      cursor--;
+    }
+    while (cursor > 0 && !_isSpace(text.codeUnitAt(cursor - 1))) {
+      cursor--;
+    }
+    return cursor;
+  }
+
+  int _nextWordBoundary(int offset) {
+    final text = widget.controller.text;
+    var cursor = offset.clamp(0, text.length);
+    while (cursor < text.length && !_isSpace(text.codeUnitAt(cursor))) {
+      cursor++;
+    }
+    while (cursor < text.length && _isSpace(text.codeUnitAt(cursor))) {
+      cursor++;
+    }
+    return cursor;
+  }
+
+  bool _isSpace(int codeUnit) {
+    return codeUnit == 9 || codeUnit == 10 || codeUnit == 13 || codeUnit == 32;
+  }
+
+  void _handleCopy() {
+    final sel = widget.controller.selection;
+    if (sel.start == sel.end) return;
+    final text = widget.controller.text;
+    final selected = text.substring(
+      sel.start.clamp(0, text.length),
+      sel.end.clamp(0, text.length),
+    );
+    Clipboard.setData(ClipboardData(text: selected));
+  }
+
+  void _handleCut() {
+    _handleCopy();
+    final sel = widget.controller.selection;
+    if (sel.start != sel.end) {
+      _insertText('');
+    }
+  }
+
+  void _handlePaste() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text != null && data!.text!.isNotEmpty) {
+      _insertText(data.text!);
+    }
   }
 
   void _handlePointerDown(PointerDownEvent event) {
@@ -362,13 +725,27 @@ class _EditorStackState extends State<_EditorStack> {
     widget.focusNode.requestFocus();
     if (event.buttons == kPrimaryMouseButton) {
       _isMouseSelecting = true;
+      _isAdditiveSelection = HardwareKeyboard.instance.isControlPressed;
       _dragAnchorOffset = offset;
-      if (HardwareKeyboard.instance.isControlPressed) {
-        widget.controller.toggleActiveCursor(offset);
-        widget.controller.selection = TextSelection.collapsed(offset: offset);
-      } else {
+      final text = widget.controller.text;
+      final atBreak = offset < text.length && text.codeUnitAt(offset) == 10;
+      final sel = TextSelection(
+        baseOffset: offset,
+        extentOffset: offset,
+        affinity: atBreak ? TextAffinity.upstream : TextAffinity.downstream,
+      );
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        final current = widget.controller.selection;
+        widget.controller.selection = TextSelection(
+          baseOffset: current.baseOffset,
+          extentOffset: offset,
+          affinity: sel.affinity,
+        );
+      } else if (!_isAdditiveSelection) {
         widget.controller.clearActiveCursors();
-        widget.controller.selection = TextSelection.collapsed(offset: offset);
+        widget.controller.selection = sel;
+      } else {
+        widget.controller.selection = sel;
       }
     }
   }
@@ -390,12 +767,31 @@ class _EditorStackState extends State<_EditorStack> {
 
   void _handlePointerUp(PointerUpEvent event) {
     if (event.kind == PointerDeviceKind.mouse) {
+      if (_isAdditiveSelection) {
+        final selection = widget.controller.selection;
+        final range = EditorSelectionRange(
+          baseOffset: selection.baseOffset,
+          extentOffset: selection.extentOffset,
+        );
+        if (range.isCollapsed) {
+          widget.controller.toggleActiveCursor(range.baseOffset);
+        } else {
+          widget.controller.setActiveSelections([
+            ...widget.controller.activeCursors,
+            range,
+          ]);
+        }
+        widget.controller.selection = TextSelection.collapsed(
+          offset: range.extentOffset,
+        );
+      }
       _stopSelecting();
     }
   }
 
   void _stopSelecting() {
     _isMouseSelecting = false;
+    _isAdditiveSelection = false;
     _dragAnchorOffset = null;
   }
 
@@ -415,8 +811,12 @@ class _EditorStackState extends State<_EditorStack> {
         (widget.style.fontSize ?? 14) * (widget.style.height ?? 1.45);
     final x = (localPosition.dx - 18).clamp(0.0, double.infinity);
     final y = (localPosition.dy - 16).clamp(0.0, double.infinity);
-    final line = (y / lineHeight).floor();
-    final column = (x / _SourcePaneState._charWidth).round();
+    final line = (y / lineHeight).floor().clamp(0, widget.controller.buffer.lineCount - 1);
+    
+    final lineText = widget.controller.buffer.lineText(line);
+    final charWidth = _SourcePaneState._charWidth;
+    final column = (x / charWidth).round().clamp(0, lineText.length);
+    
     return widget.controller.buffer.offsetForPosition(
       EditorTextPosition(line: line, column: column),
     );
@@ -463,10 +863,17 @@ class _EditorScrollBehavior extends MaterialScrollBehavior {
 }
 
 class _LineGutter extends StatelessWidget {
-  const _LineGutter({required this.controller, required this.style});
+  const _LineGutter({
+    required this.controller,
+    required this.scrollController,
+    required this.style,
+    required this.viewportHeight,
+  });
 
   final WhiskEditorController controller;
+  final ScrollController scrollController;
   final TextStyle style;
+  final double viewportHeight;
 
   static double widthFor(int lineCount) {
     final width = (lineCount.toString().length * 9 + 28).toDouble();
@@ -476,19 +883,37 @@ class _LineGutter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: Listenable.merge([controller, scrollController]),
       builder: (context, _) {
         final lineCount = controller.buffer.lineCount;
         final lineHeight = (style.fontSize ?? 14) * (style.height ?? 1.45);
+        final scrollOffset = scrollController.hasClients
+            ? scrollController.offset
+            : 0.0;
+        final visible = controller.buffer.visibleLineRange(
+          scrollOffset: scrollOffset,
+          viewportHeight: viewportHeight,
+          lineHeight: lineHeight,
+        );
+        final topPadding = 16 + visible.firstLine * lineHeight;
+        final bottomPadding =
+            ((lineCount - visible.lastLine - 1).clamp(0, lineCount) *
+                lineHeight) +
+            24;
 
         return Container(
           width: widthFor(lineCount),
-          padding: const EdgeInsets.fromLTRB(10, 16, 8, 24),
+          padding: const EdgeInsets.fromLTRB(10, 0, 8, 0),
           color: kAppBlack,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              for (var index = 0; index < lineCount; index++)
+              SizedBox(height: topPadding),
+              for (
+                var index = visible.firstLine;
+                index <= visible.lastLine;
+                index++
+              )
                 SizedBox(
                   height: lineHeight,
                   child: Text(
@@ -501,6 +926,7 @@ class _LineGutter extends StatelessWidget {
                     ),
                   ),
                 ),
+              SizedBox(height: bottomPadding),
             ],
           ),
         );
@@ -510,26 +936,19 @@ class _LineGutter extends StatelessWidget {
 }
 
 class _EditorOverlayPainter extends CustomPainter {
-  _EditorOverlayPainter({required this.controller, required this.style})
-    : super(repaint: controller);
+  _EditorOverlayPainter({
+    required this.controller,
+    required this.style,
+    required this.visibleRange,
+  }) : super(repaint: controller);
 
   final WhiskEditorController controller;
   final TextStyle style;
+  final ({int firstLine, int lastLine}) visibleRange;
 
   @override
   void paint(Canvas canvas, Size size) {
     final text = controller.text;
-
-    final textPainter = TextPainter(
-      text: controller.highlighter.highlight(
-        text: text,
-        environmentId: controller.environmentId,
-        baseStyle: style,
-      ),
-      textDirection: TextDirection.ltr,
-      strutStyle: _SourcePaneState._strutStyle,
-    )..layout(maxWidth: size.width);
-
     final primarySelectionPaint = Paint()
       ..color = kAccentBlue.withValues(alpha: 0.24);
     final primaryCaretPaint = Paint()
@@ -541,92 +960,197 @@ class _EditorOverlayPainter extends CustomPainter {
       ..color = kAccentAmber
       ..strokeWidth = 2;
     final lineHeight = (style.fontSize ?? 14) * (style.height ?? 1.45);
+    final charWidth = _SourcePaneState._charWidth;
 
     final selection = controller.selection;
     if (selection.isValid) {
       final base = selection.baseOffset.clamp(0, text.length);
       final extent = selection.extentOffset.clamp(0, text.length);
       if (base == extent) {
+        final pos = controller.buffer.positionForOffset(extent);
+        if (pos.line >= visibleRange.firstLine &&
+            pos.line <= visibleRange.lastLine) {
+          _paintCaret(
+            canvas,
+            offset: extent,
+            affinity: selection.affinity,
+            lineHeight: lineHeight,
+            charWidth: charWidth,
+            height: lineHeight,
+            paint: primaryCaretPaint,
+          );
+        }
+      } else {
+        final startPos = controller.buffer.positionForOffset(base);
+        final endPos = controller.buffer.positionForOffset(extent);
+        if (endPos.line >= visibleRange.firstLine &&
+            startPos.line <= visibleRange.lastLine) {
+          _paintSelection(
+            canvas,
+            selection: TextSelection(baseOffset: base, extentOffset: extent),
+            lineHeight: lineHeight,
+            charWidth: charWidth,
+            paint: primarySelectionPaint,
+          );
+        }
+      }
+    }
+
+    for (final cursor in controller.activeCursors) {
+      if (cursor.isCollapsed) {
+        final offset = cursor.start.clamp(0, text.length);
+        final pos = controller.buffer.positionForOffset(offset);
+        if (pos.line < visibleRange.firstLine ||
+            pos.line > visibleRange.lastLine) {
+          continue;
+        }
+
+        final atBreak = offset < text.length && text.codeUnitAt(offset) == 10;
         _paintCaret(
           canvas,
-          textPainter,
-          offset: extent,
+          offset: offset,
+          affinity: atBreak ? TextAffinity.upstream : TextAffinity.downstream,
+          lineHeight: lineHeight,
+          charWidth: charWidth,
           height: lineHeight,
           paint: primaryCaretPaint,
         );
       } else {
+        final start = cursor.start.clamp(0, text.length);
+        final end = cursor.end.clamp(0, text.length);
+        final startPos = controller.buffer.positionForOffset(start);
+        final endPos = controller.buffer.positionForOffset(end);
+        if (endPos.line < visibleRange.firstLine ||
+            startPos.line > visibleRange.lastLine) {
+          continue;
+        }
+
         _paintSelection(
           canvas,
-          textPainter,
-          selection: TextSelection(baseOffset: base, extentOffset: extent),
+          selection: TextSelection(
+            baseOffset: start,
+            extentOffset: end,
+          ),
+          lineHeight: lineHeight,
+          charWidth: charWidth,
           paint: primarySelectionPaint,
         );
       }
     }
 
-    for (final cursor in controller.activeCursors) {
-      final offset = cursor.isCollapsed ? cursor.start : cursor.start;
-      _paintCaret(
-        canvas,
-        textPainter,
-        offset: offset.clamp(0, text.length),
-        height: lineHeight,
-        paint: primaryCaretPaint,
-      );
-    }
-
     for (final selection in controller.secondarySelections) {
       if (selection.isCollapsed) {
+        final offset = selection.start.clamp(0, text.length);
+        final pos = controller.buffer.positionForOffset(offset);
+        if (pos.line < visibleRange.firstLine ||
+            pos.line > visibleRange.lastLine) {
+          continue;
+        }
+
+        final atBreak = offset < text.length && text.codeUnitAt(offset) == 10;
         _paintCaret(
           canvas,
-          textPainter,
-          offset: selection.start.clamp(0, text.length),
+          offset: offset,
+          affinity: atBreak ? TextAffinity.upstream : TextAffinity.downstream,
+          lineHeight: lineHeight,
+          charWidth: charWidth,
           height: lineHeight,
           paint: secondaryCaretPaint,
         );
         continue;
       }
 
+      final start = selection.start.clamp(0, text.length);
+      final end = selection.end.clamp(0, text.length);
+      final startPos = controller.buffer.positionForOffset(start);
+      final endPos = controller.buffer.positionForOffset(end);
+      if (endPos.line < visibleRange.firstLine ||
+          startPos.line > visibleRange.lastLine) {
+        continue;
+      }
+
       _paintSelection(
         canvas,
-        textPainter,
         selection: TextSelection(
-          baseOffset: selection.start.clamp(0, text.length),
-          extentOffset: selection.end.clamp(0, text.length),
+          baseOffset: start,
+          extentOffset: end,
         ),
+        lineHeight: lineHeight,
+        charWidth: charWidth,
         paint: secondarySelectionPaint,
       );
     }
   }
 
   void _paintSelection(
-    Canvas canvas,
-    TextPainter textPainter, {
+    Canvas canvas, {
     required TextSelection selection,
+    required double lineHeight,
+    required double charWidth,
     required Paint paint,
   }) {
-    final boxes = textPainter.getBoxesForSelection(selection);
-    for (final box in boxes) {
-      canvas.drawRect(box.toRect(), paint);
+    final start = selection.start;
+    final end = selection.end;
+    if (start == end) return;
+    final startPosition = controller.buffer.positionForOffset(start);
+    final endPosition = controller.buffer.positionForOffset(end);
+
+    for (var line = startPosition.line; line <= endPosition.line; line++) {
+      final lineStart = controller.buffer.lineStarts[line];
+      final lineText = controller.buffer.lineText(line);
+      final lineEnd = lineStart + lineText.length;
+      final startColumn = line == startPosition.line ? startPosition.column : 0;
+      final endColumn = line == endPosition.line
+          ? endPosition.column
+          : lineEnd - lineStart;
+      if (endColumn <= startColumn) continue;
+      
+      final left = startColumn * charWidth;
+      final width = (endColumn - startColumn) * charWidth;
+      
+      canvas.drawRect(
+        Rect.fromLTWH(
+          left,
+          line * lineHeight,
+          width,
+          lineHeight,
+        ),
+        paint,
+      );
     }
   }
 
   void _paintCaret(
-    Canvas canvas,
-    TextPainter textPainter, {
+    Canvas canvas, {
     required int offset,
+    required TextAffinity affinity,
+    required double lineHeight,
+    required double charWidth,
     required double height,
     required Paint paint,
   }) {
-    final caret = textPainter.getOffsetForCaret(
-      TextPosition(offset: offset),
-      Rect.zero,
+    var position = controller.buffer.positionForOffset(offset);
+    if (affinity == TextAffinity.upstream &&
+        offset < controller.text.length &&
+        controller.text.codeUnitAt(offset) == 10) {
+      position = EditorTextPosition(
+        line: position.line,
+        column: controller.buffer.lineText(position.line).length,
+      );
+    }
+    
+    final caretX = position.column * charWidth;
+    final caret = Offset(
+      caretX,
+      position.line * lineHeight,
     );
     canvas.drawLine(caret, caret.translate(0, height), paint);
   }
 
   @override
   bool shouldRepaint(covariant _EditorOverlayPainter oldDelegate) {
-    return oldDelegate.controller != controller || oldDelegate.style != style;
+    return oldDelegate.controller != controller ||
+        oldDelegate.style != style ||
+        oldDelegate.visibleRange != visibleRange;
   }
 }

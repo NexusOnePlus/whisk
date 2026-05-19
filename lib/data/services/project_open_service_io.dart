@@ -34,7 +34,7 @@ class ProjectOpenService {
             (file) => WhiskFile(
               path: file.path,
               name: file.uri.pathSegments.last,
-              extension: _extensionOf(file.path),
+              extension: extensionOf(file.path),
               content: file.path == source.path ? content : '',
               projectRoot: root.path,
             ),
@@ -52,6 +52,9 @@ class ProjectOpenService {
         .where((file) => file.path.toLowerCase().endsWith('.tex'))
         .firstOrNull;
   }
+
+  Future<List<File>> listDirectoryFiles(String path) =>
+      _listProjectFiles(Directory(path));
 
   Future<List<File>> _listProjectFiles(Directory root) async {
     final files = <File>[];
@@ -80,7 +83,7 @@ class ProjectOpenService {
   }
 
   bool _isRenderableProjectFile(String path) {
-    final extension = _extensionOf(path);
+    final extension = extensionOf(path);
     return const {
       '.tex',
       '.bib',
@@ -89,10 +92,17 @@ class ProjectOpenService {
       '.typ',
       '.md',
       '.mmd',
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.bmp',
+      '.webp',
+      '.pdf',
     }.contains(extension);
   }
 
-  String _extensionOf(String path) {
+  String extensionOf(String path) {
     final name = path.split(Platform.pathSeparator).last;
     final index = name.lastIndexOf('.');
     if (index < 0) return '';
