@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
+import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 class SourcePane extends StatelessWidget {
@@ -11,7 +12,7 @@ class SourcePane extends StatelessWidget {
   });
 
   final EnvironmentKind environment;
-  final TextEditingController controller;
+  final WhiskEditorController controller;
   final ValueChanged<String> onChanged;
 
   @override

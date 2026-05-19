@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
+import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
 import 'package:whisk/ui/features/workspace/widgets/preview_pane.dart';
 import 'package:whisk/ui/features/workspace/widgets/sidebar.dart';
@@ -23,7 +24,7 @@ class WorkspaceScreen extends StatefulWidget {
 }
 
 class _WorkspaceScreenState extends State<WorkspaceScreen> {
-  late final TextEditingController _controller;
+  late final WhiskEditorController _controller;
   late final TextEditingController _findController;
   late final FocusNode _findFocusNode;
   bool _findOpen = false;
@@ -35,7 +36,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: viewModel.activeFile.content);
+    _controller = WhiskEditorController(
+      text: viewModel.activeFile.content,
+      environmentId: viewModel.selectedEnvironment.id,
+    );
     _findController = TextEditingController();
     _findFocusNode = FocusNode();
     viewModel.addListener(_syncControllerFromModel);
@@ -52,8 +56,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   void _syncControllerFromModel() {
     final content = viewModel.activeFile.content;
+    _controller.setEnvironment(viewModel.selectedEnvironment.id);
     if (_controller.text == content) return;
-    _controller.text = content;
+    _controller.setTextFromModel(content);
   }
 
   void _toggleFind() {
@@ -121,6 +126,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
             viewModel.saveActiveFile,
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             _toggleFind,
+        const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+            _controller.undoEdit,
+        const SingleActivator(LogicalKeyboardKey.keyY, control: true):
+            _controller.redoEdit,
       },
       child: Focus(
         autofocus: true,
@@ -340,7 +349,7 @@ class _WorkspaceBody extends StatelessWidget {
   });
 
   final WorkspaceViewModel viewModel;
-  final TextEditingController controller;
+  final WhiskEditorController controller;
   final bool compact;
 
   @override
