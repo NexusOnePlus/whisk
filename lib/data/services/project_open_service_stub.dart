@@ -1,9 +1,9 @@
-import 'package:whisk/domain/models/whisk_file.dart';
+import 'package:whisk/domain/models/whisk_project.dart';
 
 class ProjectOpenService {
   const ProjectOpenService();
 
-  Future<WhiskFile?> pickLatexProject() async {
+  Future<WhiskProject?> pickLatexProject() async {
     return null;
   }
 }

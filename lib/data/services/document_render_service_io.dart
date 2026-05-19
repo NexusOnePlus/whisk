@@ -1,11 +1,16 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:whisk/data/services/engine_provision_service.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 
 class DocumentRenderService {
-  const DocumentRenderService();
+  const DocumentRenderService({
+    this.engineProvisionService = const EngineProvisionService(),
+  });
+
+  final EngineProvisionService engineProvisionService;
 
   Future<RenderResult> render({
     required String environmentId,
@@ -28,12 +33,24 @@ class DocumentRenderService {
     final source = File(workspace.sourcePath);
     await source.writeAsString(file.content);
 
-    final attempts = <_RenderAttempt>[
-      _RenderAttempt(
-        engine: 'tectonic',
-        executable: 'tectonic',
-        arguments: [workspace.entrypoint, '--outdir', workspace.buildArgument],
-      ),
+    final tectonic = await engineProvisionService.ensureTectonic();
+    final attempts = <_RenderAttempt>[];
+
+    if (tectonic.available && tectonic.executablePath != null) {
+      attempts.add(
+        _RenderAttempt(
+          engine: 'tectonic',
+          executable: tectonic.executablePath!,
+          arguments: [
+            workspace.entrypoint,
+            '--outdir',
+            workspace.buildArgument,
+          ],
+        ),
+      );
+    }
+
+    attempts.addAll([
       _RenderAttempt(
         engine: 'latexmk',
         executable: 'latexmk',
@@ -55,13 +72,14 @@ class DocumentRenderService {
           workspace.entrypoint,
         ],
       ),
-    ];
+    ]);
 
     final logs = StringBuffer();
     logs
       ..writeln('project: ${root.path}')
       ..writeln('build: ${build.path}')
       ..writeln('cache: ${workspace.cacheRoot.path}')
+      ..writeln(tectonic.log.trim())
       ..writeln();
 
     for (final attempt in attempts) {
@@ -88,7 +106,7 @@ class DocumentRenderService {
     }
 
     return RenderResult.failed(
-      'Could not render LaTeX. Install one of: tectonic, latexmk, or pdflatex.\n\n${logs.toString()}',
+      'Could not render LaTeX. Whisk tried bundled/downloaded Tectonic first, then latexmk and pdflatex.\n\n${logs.toString()}',
     );
   }
 

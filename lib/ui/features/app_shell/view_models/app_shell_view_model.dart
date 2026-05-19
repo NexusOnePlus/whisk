@@ -10,30 +10,49 @@ class AppShellViewModel extends ChangeNotifier {
   final ProjectOpenService _projectOpenService;
   AppShellMode _mode = AppShellMode.dashboard;
   WorkspaceViewModel? _workspaceViewModel;
+  var _disposed = false;
 
   AppShellMode get mode => _mode;
   WorkspaceViewModel? get workspaceViewModel => _workspaceViewModel;
 
   void openDraftWorkspace() {
+    if (_disposed) return;
     _workspaceViewModel = WorkspaceViewModel();
     _mode = AppShellMode.workspace;
     notifyListeners();
   }
 
   Future<void> openLatexProject() async {
-    final file = await _projectOpenService.pickLatexProject();
-    if (file == null) return;
+    final project = await _projectOpenService.pickLatexProject();
+    if (_disposed) return;
+    if (project == null) return;
 
     _workspaceViewModel?.dispose();
-    _workspaceViewModel = WorkspaceViewModel(initialFile: file);
+    final workspace = WorkspaceViewModel(
+      initialFile: project.entryFile,
+      projectFiles: project.files,
+    );
+    _workspaceViewModel = workspace;
     _mode = AppShellMode.workspace;
     notifyListeners();
+
+    if (project.entryFile.extension == '.tex') {
+      await workspace.renderActiveFile();
+    }
   }
 
   void closeWorkspace() {
+    if (_disposed) return;
     _workspaceViewModel?.dispose();
     _workspaceViewModel = null;
     _mode = AppShellMode.dashboard;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _workspaceViewModel?.dispose();
+    super.dispose();
   }
 }

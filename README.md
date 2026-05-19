@@ -40,5 +40,17 @@ flutter pub get
 flutter run -d windows
 ```
 
+## Rendering
+
+The first renderer phase targets LaTeX.
+
+- Whisk tries to use its managed Tectonic binary first.
+- If Tectonic is missing, Windows builds attempt to download the latest
+  `x86_64-pc-windows-msvc` release archive from GitHub and install
+  `tectonic.exe` into the app support directory.
+- If that fails, Whisk falls back to `latexmk` and then `pdflatex` from PATH.
+- Shared engine/cache data lives under the app support cache directory.
+- Project render output lives under `.whisk/build/latex`.
+
 For now, avoid pulling in the old Kitex Rust/PDF/editor stack directly. Those
 pieces should return as isolated adapters once the product shell is stable.

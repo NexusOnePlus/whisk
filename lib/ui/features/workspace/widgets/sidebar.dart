@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
+import 'package:whisk/domain/models/whisk_file.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 enum ProjectSidebarSection { files, diagnostics, comments, renders }
@@ -7,11 +10,17 @@ enum ProjectSidebarSection { files, diagnostics, comments, renders }
 class Sidebar extends StatelessWidget {
   const Sidebar({
     super.key,
+    required this.file,
+    required this.files,
     required this.environment,
+    required this.onOpenFile,
     this.section = ProjectSidebarSection.files,
   });
 
+  final WhiskFile file;
+  final List<WhiskFile> files;
   final EnvironmentKind environment;
+  final ValueChanged<WhiskFile> onOpenFile;
   final ProjectSidebarSection section;
 
   @override
@@ -24,10 +33,16 @@ class Sidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _ProjectHeader(environment: environment),
+          _ProjectHeader(environment: environment, file: file),
           _SidebarNav(section: section),
           Expanded(
-            child: _SidebarBody(section: section, environment: environment),
+            child: _SidebarBody(
+              section: section,
+              environment: environment,
+              file: file,
+              files: files,
+              onOpenFile: onOpenFile,
+            ),
           ),
           const _SidebarStatus(),
         ],
@@ -37,9 +52,10 @@ class Sidebar extends StatelessWidget {
 }
 
 class _ProjectHeader extends StatelessWidget {
-  const _ProjectHeader({required this.environment});
+  const _ProjectHeader({required this.environment, required this.file});
 
   final EnvironmentKind environment;
+  final WhiskFile file;
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +84,9 @@ class _ProjectHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${environment.name} Draft',
+                  file.projectRoot == null
+                      ? '${environment.name} Draft'
+                      : file.projectRoot!.split(Platform.pathSeparator).last,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: kTextPrimary,
@@ -78,7 +96,7 @@ class _ProjectHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'sample${environment.extension}',
+                  file.name,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: kTextMuted, fontSize: 12),
                 ),
@@ -105,9 +123,9 @@ class _SidebarNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 44,
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-      padding: const EdgeInsets.all(4),
+      height: 38,
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: kAppBlack,
         borderRadius: BorderRadius.circular(999),
@@ -172,16 +190,16 @@ class _NavButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: active ? kTextPrimary : kTextMuted),
+              Icon(icon, size: 14, color: active ? kTextPrimary : kTextMuted),
               if (active || label == 'Comments') ...[
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
                 Flexible(
                   child: Text(
                     label,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: active ? kTextPrimary : kTextMuted,
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: active ? FontWeight.w800 : FontWeight.w600,
                     ),
                   ),
@@ -196,15 +214,29 @@ class _NavButton extends StatelessWidget {
 }
 
 class _SidebarBody extends StatelessWidget {
-  const _SidebarBody({required this.section, required this.environment});
+  const _SidebarBody({
+    required this.section,
+    required this.environment,
+    required this.file,
+    required this.files,
+    required this.onOpenFile,
+  });
 
   final ProjectSidebarSection section;
   final EnvironmentKind environment;
+  final WhiskFile file;
+  final List<WhiskFile> files;
+  final ValueChanged<WhiskFile> onOpenFile;
 
   @override
   Widget build(BuildContext context) {
     return switch (section) {
-      ProjectSidebarSection.files => _FilesSection(environment: environment),
+      ProjectSidebarSection.files => _FilesSection(
+        environment: environment,
+        file: file,
+        files: files,
+        onOpenFile: onOpenFile,
+      ),
       ProjectSidebarSection.diagnostics => const _EmptySection(
         icon: Icons.bug_report_outlined,
         title: 'No diagnostics',
@@ -225,9 +257,17 @@ class _SidebarBody extends StatelessWidget {
 }
 
 class _FilesSection extends StatelessWidget {
-  const _FilesSection({required this.environment});
+  const _FilesSection({
+    required this.environment,
+    required this.file,
+    required this.files,
+    required this.onOpenFile,
+  });
 
   final EnvironmentKind environment;
+  final WhiskFile file;
+  final List<WhiskFile> files;
+  final ValueChanged<WhiskFile> onOpenFile;
 
   @override
   Widget build(BuildContext context) {
@@ -238,50 +278,36 @@ class _FilesSection extends StatelessWidget {
         const SizedBox(height: 10),
         const _SearchBox(),
         const SizedBox(height: 12),
-        _FileRow(
-          icon: environment.icon,
-          label: 'main${environment.extension}',
-          detail: 'active source',
-          selected: true,
-        ),
-        if (environment.id == 'latex') ...const [
+        for (final projectFile in files)
           _FileRow(
-            icon: Icons.article_outlined,
-            label: 'references.bib',
-            detail: 'bibliography',
+            icon: _iconFor(projectFile),
+            label: projectFile.name,
+            detail: _detailFor(projectFile),
+            selected: projectFile.path == file.path,
+            onTap: () => onOpenFile(projectFile),
           ),
-          _FileRow(
-            icon: Icons.image_outlined,
-            label: 'figures',
-            detail: 'assets folder',
-          ),
-        ],
-        if (environment.id == 'typst') ...const [
-          _FileRow(
-            icon: Icons.style_outlined,
-            label: 'theme.typ',
-            detail: 'document styles',
-          ),
-          _FileRow(
-            icon: Icons.table_chart_outlined,
-            label: 'data.csv',
-            detail: 'source data',
-          ),
-        ],
-        if (environment.id == 'mermaid') ...const [
-          _FileRow(
-            icon: Icons.account_tree_outlined,
-            label: 'system.mmd',
-            detail: 'architecture graph',
-          ),
-          _FileRow(
-            icon: Icons.schema_outlined,
-            label: 'sequence.mmd',
-            detail: 'interaction flow',
-          ),
-        ],
       ],
     );
+  }
+
+  IconData _iconFor(WhiskFile file) {
+    return switch (file.extension) {
+      '.tex' => environment.icon,
+      '.bib' => Icons.book_outlined,
+      '.sty' || '.cls' => Icons.tune_outlined,
+      '.typ' => Icons.description_outlined,
+      '.md' => Icons.notes_outlined,
+      '.mmd' => Icons.account_tree_outlined,
+      _ => Icons.insert_drive_file_outlined,
+    };
+  }
+
+  String _detailFor(WhiskFile projectFile) {
+    if (projectFile.projectRoot == null) return 'draft';
+    final root = projectFile.projectRoot!;
+    if (!projectFile.path.startsWith(root)) return projectFile.path;
+    final relative = projectFile.path.substring(root.length);
+    return relative.replaceFirst(RegExp(r'^[\\/]+'), '');
   }
 }
 
@@ -321,52 +347,67 @@ class _FileRow extends StatelessWidget {
     required this.label,
     required this.detail,
     this.selected = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String detail;
   final bool selected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 54,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: selected ? kPanelRaised : Colors.transparent,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: selected ? kBorder : Colors.transparent),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: selected ? kAccentBlue : kTextSecondary, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: selected ? kTextPrimary : kTextSecondary,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  detail,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: kTextMuted, fontSize: 11),
-                ),
-              ],
-            ),
+        onTap: onTap,
+        child: Container(
+          height: 54,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected ? kPanelRaised : Colors.transparent,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: selected ? kBorder : Colors.transparent),
           ),
-        ],
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: selected ? kAccentBlue : kTextSecondary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected ? kTextPrimary : kTextSecondary,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      detail,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: kTextMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
-class PreviewPane extends StatelessWidget {
+class PreviewPane extends StatefulWidget {
   const PreviewPane({
     super.key,
     required this.environment,
@@ -17,7 +17,16 @@ class PreviewPane extends StatelessWidget {
   final VoidCallback onRender;
 
   @override
+  State<PreviewPane> createState() => _PreviewPaneState();
+}
+
+class _PreviewPaneState extends State<PreviewPane> {
+  bool _showLogs = false;
+
+  @override
   Widget build(BuildContext context) {
+    final result = widget.result;
+    final environment = widget.environment;
     final canRender = environment.id == 'latex' && !result.isRendering;
 
     return Padding(
@@ -25,56 +34,99 @@ class PreviewPane extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const _PreviewPill(
-                icon: Icons.picture_as_pdf_outlined,
-                label: 'PDF preview',
-                color: kAccentBlue,
-              ),
-              const SizedBox(width: 8),
-              _PreviewPill(label: _statusLabel(result)),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: canRender ? onRender : null,
-                icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                label: Text(result.isRendering ? 'Rendering' : 'Render'),
-                style: TextButton.styleFrom(
-                  foregroundColor: kAppBlack,
-                  backgroundColor: kTextPrimary,
-                  disabledForegroundColor: kTextMuted,
-                  disabledBackgroundColor: kPanelRaised,
-                  minimumSize: const Size(0, 34),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 480;
+              return Row(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          const _PreviewPill(
+                            icon: Icons.picture_as_pdf_outlined,
+                            label: 'PDF preview',
+                            color: kAccentBlue,
+                          ),
+                          const SizedBox(width: 8),
+                          _PreviewPill(label: _statusLabel(result)),
+                          if (result.log.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            _PreviewPill(
+                              icon: Icons.terminal_outlined,
+                              label: _showLogs ? 'logs' : 'pdf',
+                              color: _showLogs ? kAccentAmber : null,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: 'Export',
-                onPressed: () {},
-                icon: const Icon(Icons.file_upload_outlined),
-                color: kTextSecondary,
-              ),
-              IconButton(
-                tooltip: 'Zoom',
-                onPressed: () {},
-                icon: const Icon(Icons.zoom_in),
-                color: kTextSecondary,
-              ),
-              IconButton(
-                tooltip: 'Preview options',
-                onPressed: () {},
-                icon: const Icon(Icons.more_horiz),
-                color: kTextSecondary,
-              ),
-            ],
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: canRender ? widget.onRender : null,
+                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                    label: compact
+                        ? const SizedBox.shrink()
+                        : Text(result.isRendering ? 'Rendering' : 'Render'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: kAppBlack,
+                      backgroundColor: kTextPrimary,
+                      disabledForegroundColor: kTextMuted,
+                      disabledBackgroundColor: kPanelRaised,
+                      minimumSize: Size(compact ? 38 : 0, 34),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 10 : 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      tooltip: 'Compiler logs',
+                      onPressed: result.log.isEmpty
+                          ? null
+                          : () => setState(() => _showLogs = !_showLogs),
+                      icon: const Icon(Icons.terminal_outlined),
+                      color: _showLogs ? kAccentAmber : kTextSecondary,
+                    ),
+                    IconButton(
+                      tooltip: 'Preview options',
+                      onPressed: () {},
+                      icon: const Icon(Icons.more_horiz),
+                      color: kTextSecondary,
+                    ),
+                  ] else
+                    PopupMenuButton<_PreviewAction>(
+                      tooltip: 'Preview options',
+                      icon: const Icon(Icons.more_horiz),
+                      color: kPanelRaised,
+                      onSelected: (action) {
+                        if (action == _PreviewAction.logs &&
+                            result.log.isNotEmpty) {
+                          setState(() => _showLogs = !_showLogs);
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: _PreviewAction.logs,
+                          child: Text('Compiler logs'),
+                        ),
+                      ],
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: _PreviewSurface(environment: environment, result: result),
+            child: _showLogs && result.log.isNotEmpty
+                ? _CompilerLogView(log: result.log)
+                : _PreviewSurface(environment: environment, result: result),
           ),
         ],
       ),
@@ -91,6 +143,38 @@ class PreviewPane extends StatelessWidget {
   }
 }
 
+enum _PreviewAction { logs }
+
+class _CompilerLogView extends StatelessWidget {
+  const _CompilerLogView({required this.log});
+
+  final String log;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kAppBlack,
+        border: Border.all(color: kBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        child: SelectableText(
+          log,
+          style: const TextStyle(
+            color: kTextSecondary,
+            fontFamily: 'monospace',
+            fontSize: 12,
+            height: 1.35,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PreviewPill extends StatelessWidget {
   const _PreviewPill({required this.label, this.icon, this.color});
 
@@ -101,8 +185,8 @@ class _PreviewPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 26,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
       decoration: BoxDecoration(
         color: kPanelRaised,
         borderRadius: BorderRadius.circular(999),
@@ -112,12 +196,12 @@ class _PreviewPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, color: color ?? kTextSecondary, size: 16),
-            const SizedBox(width: 7),
+            Icon(icon, color: color ?? kTextSecondary, size: 13),
+            const SizedBox(width: 5),
           ],
           Text(
             label,
-            style: const TextStyle(color: kTextSecondary, fontSize: 12),
+            style: const TextStyle(color: kTextSecondary, fontSize: 11),
           ),
         ],
       ),
@@ -313,6 +397,7 @@ class _PreviewMetric extends StatelessWidget {
         children: [
           Text(
             value,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: kTextPrimary,
               fontSize: 20,
