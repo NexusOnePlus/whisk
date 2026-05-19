@@ -41,6 +41,17 @@ class _SourcePaneState extends State<SourcePane> {
     color: kTextPrimary,
   );
 
+  static double? _cachedCharWidth;
+  static double get _charWidth {
+    if (_cachedCharWidth != null) return _cachedCharWidth!;
+    final tp = TextPainter(
+      text: TextSpan(text: '-' * 100, style: _style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    _cachedCharWidth = tp.width / 100;
+    return _cachedCharWidth!;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -181,7 +192,7 @@ class _SourcePaneState extends State<SourcePane> {
     final location = widget.controller.buffer.positionForOffset(offset);
     final lineHeight = (_style.fontSize ?? 14) * (_style.height ?? 1.45);
     final targetY = location.line * lineHeight - (_viewportHeight * 0.35);
-    final targetX = location.column * 8.4 - (_viewportWidth * 0.35);
+    final targetX = location.column * _charWidth - (_viewportWidth * 0.35);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animateToVisible(_verticalScrollController, targetY);
@@ -216,7 +227,7 @@ class _SourcePaneState extends State<SourcePane> {
       }
     }
     if (current > longest) longest = current;
-    return (longest * 8.4 + 56).clamp(viewportWidth, double.infinity);
+    return (longest * _charWidth + 56).clamp(viewportWidth, double.infinity);
   }
 }
 
@@ -362,13 +373,29 @@ class _EditorStackState extends State<_EditorStack> {
   int _offsetForLocalPosition(Offset localPosition) {
     final lineHeight =
         (widget.style.fontSize ?? 14) * (widget.style.height ?? 1.45);
-    final x = (localPosition.dx - 18).clamp(0, double.infinity);
-    final y = (localPosition.dy - 16).clamp(0, double.infinity);
+    final x = (localPosition.dx - 18).clamp(0.0, double.infinity);
+    final y = (localPosition.dy - 16).clamp(0.0, double.infinity);
     final line = (y / lineHeight).floor();
-    final column = (x / 8.4).round();
-    return widget.controller.buffer.offsetForPosition(
-      EditorTextPosition(line: line, column: column),
+
+    final text = widget.controller.text;
+    if (text.isEmpty) return 0;
+
+    final buffer = widget.controller.buffer;
+    if (line >= buffer.lineCount) return text.length;
+
+    final lineText = buffer.lineText(line);
+    final lineStartOffset = buffer.offsetForPosition(
+      EditorTextPosition(line: line, column: 0),
     );
+
+    final tp = TextPainter(
+      text: TextSpan(text: lineText, style: widget.style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final pos = tp.getPositionForOffset(Offset(x, 0.0));
+    final column = pos.offset.clamp(0, lineText.length);
+
+    return lineStartOffset + column;
   }
 
   ({int start, int end}) _wordRangeAt(int offset) {
