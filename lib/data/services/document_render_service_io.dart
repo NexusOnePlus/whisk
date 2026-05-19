@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 
@@ -12,7 +13,7 @@ class DocumentRenderService {
   }) async {
     if (environmentId != 'latex') {
       return RenderResult.failed(
-        'Renderer for .$environmentId is not wired yet. Phase order is LaTeX, Typst, Markdown, then Mermaid.',
+        'Renderer for $environmentId is not wired yet. Phase order is LaTeX, Typst, Markdown, then Mermaid.',
       );
     }
 
@@ -20,18 +21,18 @@ class DocumentRenderService {
   }
 
   Future<RenderResult> _renderLatex(WhiskFile file) async {
-    final root = await Directory.systemTemp.createTemp('whisk-latex-');
-    final build = Directory('${root.path}${Platform.pathSeparator}build');
-    await build.create(recursive: true);
+    final workspace = await _prepareWorkspace(file);
+    final root = workspace.projectRoot;
+    final build = workspace.buildRoot;
 
-    final source = File('${root.path}${Platform.pathSeparator}main.tex');
+    final source = File(workspace.sourcePath);
     await source.writeAsString(file.content);
 
     final attempts = <_RenderAttempt>[
       _RenderAttempt(
         engine: 'tectonic',
         executable: 'tectonic',
-        arguments: ['main.tex', '--outdir', 'build'],
+        arguments: [workspace.entrypoint, '--outdir', workspace.buildArgument],
       ),
       _RenderAttempt(
         engine: 'latexmk',
@@ -40,8 +41,8 @@ class DocumentRenderService {
           '-pdf',
           '-interaction=nonstopmode',
           '-halt-on-error',
-          '-outdir=build',
-          'main.tex',
+          '-outdir=${workspace.buildArgument}',
+          workspace.entrypoint,
         ],
       ),
       _RenderAttempt(
@@ -50,15 +51,21 @@ class DocumentRenderService {
         arguments: [
           '-interaction=nonstopmode',
           '-halt-on-error',
-          '-output-directory=build',
-          'main.tex',
+          '-output-directory=${workspace.buildArgument}',
+          workspace.entrypoint,
         ],
       ),
     ];
 
     final logs = StringBuffer();
+    logs
+      ..writeln('project: ${root.path}')
+      ..writeln('build: ${build.path}')
+      ..writeln('cache: ${workspace.cacheRoot.path}')
+      ..writeln();
+
     for (final attempt in attempts) {
-      final result = await _tryRun(attempt, root.path);
+      final result = await _tryRun(attempt, root.path, workspace.environment);
       logs
         ..writeln('> ${attempt.executable} ${attempt.arguments.join(' ')}')
         ..writeln(result.log.trim())
@@ -66,7 +73,11 @@ class DocumentRenderService {
 
       if (!result.success) continue;
 
-      final pdf = File('${build.path}${Platform.pathSeparator}main.pdf');
+      final pdfName = source.uri.pathSegments.last.replaceAll(
+        RegExp(r'\.tex$', caseSensitive: false),
+        '.pdf',
+      );
+      final pdf = File('${build.path}${Platform.pathSeparator}$pdfName');
       if (await pdf.exists()) {
         return RenderResult.success(
           pdfPath: pdf.path,
@@ -84,12 +95,15 @@ class DocumentRenderService {
   Future<_ProcessResult> _tryRun(
     _RenderAttempt attempt,
     String workingDirectory,
+    Map<String, String> environment,
   ) async {
     try {
       final result = await Process.run(
         attempt.executable,
         attempt.arguments,
         workingDirectory: workingDirectory,
+        environment: environment,
+        includeParentEnvironment: true,
         runInShell: Platform.isWindows,
       );
       return _ProcessResult(
@@ -100,6 +114,82 @@ class DocumentRenderService {
       return _ProcessResult(success: false, log: error.message);
     }
   }
+
+  Future<_RenderWorkspace> _prepareWorkspace(WhiskFile file) async {
+    final support = await getApplicationSupportDirectory();
+    final cacheRoot = Directory(
+      '${support.path}${Platform.pathSeparator}cache',
+    );
+    await cacheRoot.create(recursive: true);
+
+    final projectRoot = file.projectRoot == null
+        ? await Directory.systemTemp.createTemp('whisk-draft-latex-')
+        : Directory(file.projectRoot!);
+
+    final whiskRoot = Directory(
+      '${projectRoot.path}${Platform.pathSeparator}.whisk',
+    );
+    final buildRoot = Directory(
+      '${whiskRoot.path}${Platform.pathSeparator}build${Platform.pathSeparator}latex',
+    );
+    await buildRoot.create(recursive: true);
+
+    final sourcePath = file.projectRoot == null
+        ? '${projectRoot.path}${Platform.pathSeparator}main.tex'
+        : file.path;
+    final entrypoint = _relativeToProject(
+      sourcePath: sourcePath,
+      projectRoot: projectRoot.path,
+    );
+
+    return _RenderWorkspace(
+      projectRoot: projectRoot,
+      buildRoot: buildRoot,
+      cacheRoot: cacheRoot,
+      sourcePath: sourcePath,
+      entrypoint: entrypoint,
+      buildArgument: buildRoot.path,
+      environment: {
+        'WHISK_CACHE_DIR': cacheRoot.path,
+        'TEXMFVAR': '${cacheRoot.path}${Platform.pathSeparator}texmf-var',
+        'TEXMFCONFIG': '${cacheRoot.path}${Platform.pathSeparator}texmf-config',
+      },
+    );
+  }
+
+  String _relativeToProject({
+    required String sourcePath,
+    required String projectRoot,
+  }) {
+    final normalizedRoot = projectRoot.endsWith(Platform.pathSeparator)
+        ? projectRoot
+        : '$projectRoot${Platform.pathSeparator}';
+    if (!sourcePath.startsWith(normalizedRoot)) {
+      return sourcePath;
+    }
+
+    return sourcePath.substring(normalizedRoot.length);
+  }
+}
+
+class _RenderWorkspace {
+  const _RenderWorkspace({
+    required this.projectRoot,
+    required this.buildRoot,
+    required this.cacheRoot,
+    required this.sourcePath,
+    required this.entrypoint,
+    required this.buildArgument,
+    required this.environment,
+  });
+
+  final Directory projectRoot;
+  final Directory buildRoot;
+  final Directory cacheRoot;
+  final String sourcePath;
+  final String entrypoint;
+  final String buildArgument;
+  final Map<String, String> environment;
 }
 
 class _RenderAttempt {

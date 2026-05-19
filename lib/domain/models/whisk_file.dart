@@ -4,6 +4,7 @@ class WhiskFile {
     required this.name,
     required this.extension,
     required this.content,
+    this.projectRoot,
     this.isDirty = false,
   });
 
@@ -11,6 +12,7 @@ class WhiskFile {
   final String name;
   final String extension;
   final String content;
+  final String? projectRoot;
   final bool isDirty;
 
   WhiskFile copyWith({
@@ -18,6 +20,7 @@ class WhiskFile {
     String? name,
     String? extension,
     String? content,
+    String? projectRoot,
     bool? isDirty,
   }) {
     return WhiskFile(
@@ -25,6 +28,7 @@ class WhiskFile {
       name: name ?? this.name,
       extension: extension ?? this.extension,
       content: content ?? this.content,
+      projectRoot: projectRoot ?? this.projectRoot,
       isDirty: isDirty ?? this.isDirty,
     );
   }

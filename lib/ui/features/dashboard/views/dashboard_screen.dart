@@ -4,9 +4,14 @@ import 'package:whisk/ui/features/dashboard/widgets/dashboard_card.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key, required this.onOpenDraftWorkspace});
+  const DashboardScreen({
+    super.key,
+    required this.onOpenDraftWorkspace,
+    required this.onOpenLatexProject,
+  });
 
   final VoidCallback onOpenDraftWorkspace;
+  final VoidCallback onOpenLatexProject;
 
   @override
   Widget build(BuildContext context) {
@@ -29,9 +34,11 @@ class DashboardScreen extends StatelessWidget {
                         compact
                             ? _CompactDashboard(
                                 onOpenDraftWorkspace: onOpenDraftWorkspace,
+                                onOpenLatexProject: onOpenLatexProject,
                               )
                             : _WideDashboard(
                                 onOpenDraftWorkspace: onOpenDraftWorkspace,
+                                onOpenLatexProject: onOpenLatexProject,
                               ),
                       ],
                     ),
@@ -105,9 +112,13 @@ class _DashboardHeader extends StatelessWidget {
 }
 
 class _WideDashboard extends StatelessWidget {
-  const _WideDashboard({required this.onOpenDraftWorkspace});
+  const _WideDashboard({
+    required this.onOpenDraftWorkspace,
+    required this.onOpenLatexProject,
+  });
 
   final VoidCallback onOpenDraftWorkspace;
+  final VoidCallback onOpenLatexProject;
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +127,10 @@ class _WideDashboard extends StatelessWidget {
       children: [
         SizedBox(
           width: 260,
-          child: _ProjectActions(onOpenDraftWorkspace: onOpenDraftWorkspace),
+          child: _ProjectActions(
+            onOpenDraftWorkspace: onOpenDraftWorkspace,
+            onOpenLatexProject: onOpenLatexProject,
+          ),
         ),
         const SizedBox(width: 18),
         Expanded(
@@ -137,15 +151,22 @@ class _WideDashboard extends StatelessWidget {
 }
 
 class _CompactDashboard extends StatelessWidget {
-  const _CompactDashboard({required this.onOpenDraftWorkspace});
+  const _CompactDashboard({
+    required this.onOpenDraftWorkspace,
+    required this.onOpenLatexProject,
+  });
 
   final VoidCallback onOpenDraftWorkspace;
+  final VoidCallback onOpenLatexProject;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _ProjectActions(onOpenDraftWorkspace: onOpenDraftWorkspace),
+        _ProjectActions(
+          onOpenDraftWorkspace: onOpenDraftWorkspace,
+          onOpenLatexProject: onOpenLatexProject,
+        ),
         const SizedBox(height: 16),
         const _OpenProjectsCard(),
         const SizedBox(height: 16),
@@ -158,9 +179,13 @@ class _CompactDashboard extends StatelessWidget {
 }
 
 class _ProjectActions extends StatelessWidget {
-  const _ProjectActions({required this.onOpenDraftWorkspace});
+  const _ProjectActions({
+    required this.onOpenDraftWorkspace,
+    required this.onOpenLatexProject,
+  });
 
   final VoidCallback onOpenDraftWorkspace;
+  final VoidCallback onOpenLatexProject;
 
   @override
   Widget build(BuildContext context) {
@@ -176,8 +201,8 @@ class _ProjectActions extends StatelessWidget {
         children: [
           _CreateProjectRow(
             icon: Icons.functions,
-            title: 'LaTeX Project',
-            subtitle: 'Papers, reports and equations',
+            title: 'LaTeX Draft',
+            subtitle: 'Start from a sample .tex file',
             onTap: onOpenDraftWorkspace,
           ),
           const _CreateProjectRow(
@@ -190,10 +215,11 @@ class _ProjectActions extends StatelessWidget {
             title: 'Mermaid Project',
             subtitle: 'Diagrams and flows',
           ),
-          const _CreateProjectRow(
+          _CreateProjectRow(
             icon: Icons.folder_open_outlined,
-            title: 'Open Folder',
-            subtitle: 'Use an existing workspace',
+            title: 'Open LaTeX Folder',
+            subtitle: 'Load main.tex or first .tex file',
+            onTap: onOpenLatexProject,
           ),
         ],
       ),

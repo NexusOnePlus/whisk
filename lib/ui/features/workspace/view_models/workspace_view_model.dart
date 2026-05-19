@@ -9,8 +9,9 @@ class WorkspaceViewModel extends ChangeNotifier {
   WorkspaceViewModel({
     EnvironmentCatalog catalog = const EnvironmentCatalog(),
     this._renderService = const DocumentRenderService(),
+    WhiskFile? initialFile,
   }) : _environments = catalog.listEnvironments() {
-    _activeFile = _fileForEnvironment(_environments.first);
+    _activeFile = initialFile ?? _fileForEnvironment(_environments.first);
   }
 
   final DocumentRenderService _renderService;

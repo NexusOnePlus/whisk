@@ -33,6 +33,7 @@ class _AppShellState extends State<AppShell> {
         return switch (viewModel.mode) {
           AppShellMode.dashboard => DashboardScreen(
             onOpenDraftWorkspace: viewModel.openDraftWorkspace,
+            onOpenLatexProject: viewModel.openLatexProject,
           ),
           AppShellMode.workspace => WorkspaceScreen(
             viewModel: viewModel.workspaceViewModel!,
