@@ -32,6 +32,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   bool _findOpen = false;
   int _findCursor = 0;
   List<int> _findMatches = const [];
+  int _revealRevision = 0;
+  int? _revealOffset;
 
   WorkspaceViewModel get viewModel => widget.viewModel;
 
@@ -127,6 +129,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _controller.setSecondarySelections([
       EditorSelectionRange(baseOffset: start, extentOffset: end),
     ]);
+    setState(() {
+      _revealOffset = start;
+      _revealRevision++;
+    });
   }
 
   @override
@@ -181,6 +187,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                               viewModel: viewModel,
                               controller: _controller,
                               editorFocusNode: _editorFocusNode,
+                              revealRevision: _revealRevision,
+                              revealOffset: _revealOffset,
                               compact: true,
                             ),
                           ),
@@ -226,6 +234,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                   viewModel: viewModel,
                                   controller: _controller,
                                   editorFocusNode: _editorFocusNode,
+                                  revealRevision: _revealRevision,
+                                  revealOffset: _revealOffset,
                                 ),
                               ),
                             ],
@@ -359,12 +369,16 @@ class _WorkspaceBody extends StatelessWidget {
     required this.viewModel,
     required this.controller,
     required this.editorFocusNode,
+    required this.revealRevision,
+    this.revealOffset,
     this.compact = false,
   });
 
   final WorkspaceViewModel viewModel;
   final WhiskEditorController controller;
   final FocusNode editorFocusNode;
+  final int revealRevision;
+  final int? revealOffset;
   final bool compact;
 
   @override
@@ -373,6 +387,8 @@ class _WorkspaceBody extends StatelessWidget {
       environment: viewModel.selectedEnvironment,
       controller: controller,
       focusNode: editorFocusNode,
+      revealRevision: revealRevision,
+      revealOffset: revealOffset,
       onChanged: viewModel.updateActiveContent,
     );
     final preview = PreviewPane(
