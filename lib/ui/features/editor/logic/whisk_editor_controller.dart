@@ -19,10 +19,19 @@ class WhiskEditorController extends TextEditingController {
 
   final List<EditorTextOperation> _undoStack = [];
   final List<EditorTextOperation> _redoStack = [];
+  var _applyingHistory = false;
+  var _syncingFromModel = false;
 
   @override
   set value(TextEditingValue newValue) {
     final oldText = text;
+    if (!_applyingHistory && !_syncingFromModel && oldText != newValue.text) {
+      final operation = _operationFromDiff(oldText, newValue.text);
+      if (operation != null) {
+        _undoStack.add(operation);
+        _redoStack.clear();
+      }
+    }
     super.value = newValue;
     if (oldText != newValue.text) {
       buffer.setText(newValue.text);
@@ -37,14 +46,19 @@ class WhiskEditorController extends TextEditingController {
 
   void setTextFromModel(String text) {
     if (this.text == text) return;
-    value = value.copyWith(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-      composing: TextRange.empty,
-    );
-    buffer.setText(text);
-    _undoStack.clear();
-    _redoStack.clear();
+    _syncingFromModel = true;
+    try {
+      value = value.copyWith(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+        composing: TextRange.empty,
+      );
+      buffer.setText(text);
+      _undoStack.clear();
+      _redoStack.clear();
+    } finally {
+      _syncingFromModel = false;
+    }
   }
 
   void replaceRange({
@@ -55,13 +69,7 @@ class WhiskEditorController extends TextEditingController {
     final operation = buffer.replace(start: start, end: end, text: replacement);
     _undoStack.add(operation);
     _redoStack.clear();
-    value = value.copyWith(
-      text: buffer.text,
-      selection: TextSelection.collapsed(
-        offset: operation.offset + replacement.length,
-      ),
-      composing: TextRange.empty,
-    );
+    _setValueFromBuffer(selectionOffset: operation.offset + replacement.length);
   }
 
   void setSecondarySelections(List<EditorSelectionRange> selections) {
@@ -75,12 +83,8 @@ class WhiskEditorController extends TextEditingController {
     final inverse = operation.inverse;
     buffer.apply(inverse);
     _redoStack.add(operation);
-    value = value.copyWith(
-      text: buffer.text,
-      selection: TextSelection.collapsed(
-        offset: inverse.offset + inverse.insertedText.length,
-      ),
-      composing: TextRange.empty,
+    _setValueFromBuffer(
+      selectionOffset: inverse.offset + inverse.insertedText.length,
     );
     return true;
   }
@@ -90,14 +94,54 @@ class WhiskEditorController extends TextEditingController {
     final operation = _redoStack.removeLast();
     buffer.apply(operation);
     _undoStack.add(operation);
-    value = value.copyWith(
-      text: buffer.text,
-      selection: TextSelection.collapsed(
-        offset: operation.offset + operation.insertedText.length,
-      ),
-      composing: TextRange.empty,
+    _setValueFromBuffer(
+      selectionOffset: operation.offset + operation.insertedText.length,
     );
     return true;
+  }
+
+  void _setValueFromBuffer({required int selectionOffset}) {
+    _applyingHistory = true;
+    try {
+      value = value.copyWith(
+        text: buffer.text,
+        selection: TextSelection.collapsed(
+          offset: selectionOffset.clamp(0, buffer.length),
+        ),
+        composing: TextRange.empty,
+      );
+    } finally {
+      _applyingHistory = false;
+    }
+  }
+
+  EditorTextOperation? _operationFromDiff(String oldText, String newText) {
+    if (oldText == newText) return null;
+
+    var prefix = 0;
+    final minLength = oldText.length < newText.length
+        ? oldText.length
+        : newText.length;
+    while (prefix < minLength &&
+        oldText.codeUnitAt(prefix) == newText.codeUnitAt(prefix)) {
+      prefix++;
+    }
+
+    var oldSuffix = oldText.length;
+    var newSuffix = newText.length;
+    while (oldSuffix > prefix &&
+        newSuffix > prefix &&
+        oldText.codeUnitAt(oldSuffix - 1) ==
+            newText.codeUnitAt(newSuffix - 1)) {
+      oldSuffix--;
+      newSuffix--;
+    }
+
+    return EditorTextOperation(
+      offset: prefix,
+      deletedText: oldText.substring(prefix, oldSuffix),
+      insertedText: newText.substring(prefix, newSuffix),
+    );
   }
 
   @override

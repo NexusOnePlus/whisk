@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
+import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
 import 'package:whisk/ui/features/workspace/widgets/preview_pane.dart';
 import 'package:whisk/ui/features/workspace/widgets/sidebar.dart';
@@ -25,6 +26,7 @@ class WorkspaceScreen extends StatefulWidget {
 
 class _WorkspaceScreenState extends State<WorkspaceScreen> {
   late final WhiskEditorController _controller;
+  late final FocusNode _editorFocusNode;
   late final TextEditingController _findController;
   late final FocusNode _findFocusNode;
   bool _findOpen = false;
@@ -40,6 +42,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       text: viewModel.activeFile.content,
       environmentId: viewModel.selectedEnvironment.id,
     );
+    _editorFocusNode = FocusNode();
     _findController = TextEditingController();
     _findFocusNode = FocusNode();
     viewModel.addListener(_syncControllerFromModel);
@@ -49,6 +52,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   void dispose() {
     viewModel.removeListener(_syncControllerFromModel);
     _controller.dispose();
+    _editorFocusNode.dispose();
     _findController.dispose();
     _findFocusNode.dispose();
     super.dispose();
@@ -62,10 +66,13 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   void _toggleFind() {
+    final nextOpen = !_findOpen;
     setState(() {
-      _findOpen = !_findOpen;
+      _findOpen = nextOpen;
       if (_findOpen) {
         _refreshFindMatches();
+      } else {
+        _controller.setSecondarySelections(const []);
       }
     });
     if (_findOpen) {
@@ -84,6 +91,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     if (query.isEmpty) {
       _findMatches = const [];
       _findCursor = 0;
+      _controller.setSecondarySelections(const []);
       return;
     }
 
@@ -116,6 +124,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     final start = _findMatches[_findCursor];
     final end = start + _findController.text.length;
     _controller.selection = TextSelection(baseOffset: start, extentOffset: end);
+    _controller.setSecondarySelections([
+      EditorSelectionRange(baseOffset: start, extentOffset: end),
+    ]);
   }
 
   @override
@@ -169,6 +180,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                             child: _WorkspaceBody(
                               viewModel: viewModel,
                               controller: _controller,
+                              editorFocusNode: _editorFocusNode,
                               compact: true,
                             ),
                           ),
@@ -213,6 +225,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                 child: _WorkspaceBody(
                                   viewModel: viewModel,
                                   controller: _controller,
+                                  editorFocusNode: _editorFocusNode,
                                 ),
                               ),
                             ],
@@ -345,11 +358,13 @@ class _WorkspaceBody extends StatelessWidget {
   const _WorkspaceBody({
     required this.viewModel,
     required this.controller,
+    required this.editorFocusNode,
     this.compact = false,
   });
 
   final WorkspaceViewModel viewModel;
   final WhiskEditorController controller;
+  final FocusNode editorFocusNode;
   final bool compact;
 
   @override
@@ -357,6 +372,7 @@ class _WorkspaceBody extends StatelessWidget {
     final editor = SourcePane(
       environment: viewModel.selectedEnvironment,
       controller: controller,
+      focusNode: editorFocusNode,
       onChanged: viewModel.updateActiveContent,
     );
     final preview = PreviewPane(
