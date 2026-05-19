@@ -16,20 +16,44 @@ class WhiskEditorController extends TextEditingController {
   final SyntaxHighlighter highlighter;
   String environmentId;
   List<EditorSelectionRange> secondarySelections = const [];
+  List<EditorSelectionRange> activeCursors = const [];
 
-  final List<EditorTextOperation> _undoStack = [];
-  final List<EditorTextOperation> _redoStack = [];
+  final List<EditorTextTransaction> _undoStack = [];
+  final List<EditorTextTransaction> _redoStack = [];
   var _applyingHistory = false;
   var _syncingFromModel = false;
+  var _applyingCursors = false;
 
   @override
   set value(TextEditingValue newValue) {
+    final oldValue = value;
     final oldText = text;
-    if (!_applyingHistory && !_syncingFromModel && oldText != newValue.text) {
-      final operation = _operationFromDiff(oldText, newValue.text);
-      if (operation != null) {
-        _undoStack.add(operation);
-        _redoStack.clear();
+    if (!_applyingHistory && !_syncingFromModel && !_applyingCursors) {
+      if (oldText != newValue.text) {
+        final operation = _operationFromDiff(oldText, newValue.text);
+        if (operation != null) {
+          if (activeCursors.isNotEmpty && oldValue.selection.isCollapsed) {
+            _applyWithCursors(
+              primaryDelta: operation,
+              oldPrimaryOffset: oldValue.selection.extentOffset,
+            );
+            return;
+          }
+          _undoStack.add(
+            EditorTextTransaction.single(
+              operation: operation,
+              selectionOffsetBefore: oldValue.selection.extentOffset.clamp(
+                0,
+                oldText.length,
+              ),
+              selectionOffsetAfter: newValue.selection.extentOffset.clamp(
+                0,
+                newValue.text.length,
+              ),
+            ),
+          );
+          _redoStack.clear();
+        }
       }
     }
     super.value = newValue;
@@ -66,10 +90,21 @@ class WhiskEditorController extends TextEditingController {
     required int end,
     required String replacement,
   }) {
+    final oldSelectionOffset = selection.extentOffset.clamp(0, text.length);
     final operation = buffer.replace(start: start, end: end, text: replacement);
-    _undoStack.add(operation);
+    final newSelectionOffset = operation.offset + replacement.length;
+    _undoStack.add(
+      EditorTextTransaction.single(
+        operation: operation,
+        selectionOffsetBefore: oldSelectionOffset,
+        selectionOffsetAfter: newSelectionOffset,
+        cursorOffsetsBefore: _cursorOffsets,
+        cursorOffsetsAfter: const [],
+      ),
+    );
     _redoStack.clear();
-    _setValueFromBuffer(selectionOffset: operation.offset + replacement.length);
+    activeCursors = const [];
+    _setValueFromBuffer(selectionOffset: newSelectionOffset);
   }
 
   void setSecondarySelections(List<EditorSelectionRange> selections) {
@@ -77,32 +112,154 @@ class WhiskEditorController extends TextEditingController {
     notifyListeners();
   }
 
+  void toggleActiveCursor(int offset) {
+    final index = activeCursors.indexWhere((c) => c.baseOffset == offset);
+    if (index >= 0) {
+      activeCursors = [
+        ...activeCursors.sublist(0, index),
+        ...activeCursors.sublist(index + 1),
+      ];
+    } else {
+      activeCursors = [
+        ...activeCursors,
+        EditorSelectionRange(baseOffset: offset, extentOffset: offset),
+      ];
+    }
+    notifyListeners();
+  }
+
+  void clearActiveCursors() {
+    if (activeCursors.isEmpty) return;
+    activeCursors = const [];
+    notifyListeners();
+  }
+
+  void _applyWithCursors({
+    required EditorTextOperation primaryDelta,
+    required int oldPrimaryOffset,
+  }) {
+    _applyingCursors = true;
+    try {
+      final relativeEditStart = primaryDelta.offset - oldPrimaryOffset;
+      final cursorOrigins = <int>{
+        for (final c in activeCursors) c.baseOffset,
+        oldPrimaryOffset,
+      }.toList()..sort();
+      final editStarts =
+          cursorOrigins
+              .map((offset) => offset + relativeEditStart)
+              .map((offset) => offset.clamp(0, buffer.length))
+              .toSet()
+              .toList()
+            ..sort();
+      final edits = <_CursorEdit>[
+        for (final offset in editStarts)
+          _CursorEdit(offset: offset, length: primaryDelta.deletedText.length),
+      ];
+      edits.sort((a, b) => b.offset.compareTo(a.offset));
+
+      final operations = <EditorTextOperation>[];
+      for (final edit in edits) {
+        operations.add(
+          buffer.replace(
+            start: edit.offset,
+            end: edit.offset + edit.length,
+            text: primaryDelta.insertedText,
+          ),
+        );
+      }
+
+      final delta =
+          primaryDelta.insertedText.length - primaryDelta.deletedText.length;
+      int transformedOffset(int offset) {
+        var shifted = offset + primaryDelta.insertedText.length;
+        for (final editOffset in editStarts) {
+          if (editOffset >= offset) break;
+          shifted += delta;
+        }
+        return shifted.clamp(0, buffer.length);
+      }
+
+      final primaryOffset = transformedOffset(oldPrimaryOffset);
+      final newCursors = activeCursors
+          .where((cursor) => cursor.baseOffset != oldPrimaryOffset)
+          .map((cursor) => transformedOffset(cursor.baseOffset))
+          .map((o) => EditorSelectionRange(baseOffset: o, extentOffset: o))
+          .toList();
+      newCursors.sort((a, b) => a.baseOffset.compareTo(b.baseOffset));
+
+      super.value = TextEditingValue(
+        text: buffer.text,
+        selection: TextSelection.collapsed(
+          offset: primaryOffset.clamp(0, buffer.length),
+        ),
+        composing: TextRange.empty,
+      );
+
+      _undoStack.add(
+        EditorTextTransaction(
+          operations: operations,
+          selectionOffsetBefore: oldPrimaryOffset.clamp(0, text.length),
+          selectionOffsetAfter: primaryOffset,
+          cursorOffsetsBefore: _cursorOffsets,
+          cursorOffsetsAfter: [
+            for (final cursor in newCursors) cursor.baseOffset,
+          ],
+        ),
+      );
+      _redoStack.clear();
+      activeCursors = newCursors;
+      notifyListeners();
+    } finally {
+      _applyingCursors = false;
+    }
+  }
+
   bool undoEdit() {
     if (_undoStack.isEmpty) return false;
-    final operation = _undoStack.removeLast();
-    final inverse = operation.inverse;
-    buffer.apply(inverse);
-    _redoStack.add(operation);
+    final transaction = _undoStack.removeLast();
+    _applyOperations(transaction.inverseOperations());
+    _redoStack.add(transaction);
     _setValueFromBuffer(
-      selectionOffset: inverse.offset + inverse.insertedText.length,
+      selectionOffset: transaction.selectionOffsetBefore,
+      cursorOffsets: transaction.cursorOffsetsBefore,
     );
     return true;
   }
 
   bool redoEdit() {
     if (_redoStack.isEmpty) return false;
-    final operation = _redoStack.removeLast();
-    buffer.apply(operation);
-    _undoStack.add(operation);
+    final transaction = _redoStack.removeLast();
+    _applyOperations(transaction.operations);
+    _undoStack.add(transaction);
     _setValueFromBuffer(
-      selectionOffset: operation.offset + operation.insertedText.length,
+      selectionOffset: transaction.selectionOffsetAfter,
+      cursorOffsets: transaction.cursorOffsetsAfter,
     );
     return true;
   }
 
-  void _setValueFromBuffer({required int selectionOffset}) {
+  void _applyOperations(List<EditorTextOperation> operations) {
+    final ordered = [...operations]
+      ..sort((a, b) => b.offset.compareTo(a.offset));
+    for (final operation in ordered) {
+      buffer.apply(operation);
+    }
+  }
+
+  void _setValueFromBuffer({
+    required int selectionOffset,
+    List<int> cursorOffsets = const [],
+  }) {
     _applyingHistory = true;
     try {
+      activeCursors = [
+        for (final offset in cursorOffsets)
+          EditorSelectionRange(
+            baseOffset: offset.clamp(0, buffer.length),
+            extentOffset: offset.clamp(0, buffer.length),
+          ),
+      ];
       value = value.copyWith(
         text: buffer.text,
         selection: TextSelection.collapsed(
@@ -114,6 +271,10 @@ class WhiskEditorController extends TextEditingController {
       _applyingHistory = false;
     }
   }
+
+  List<int> get _cursorOffsets => [
+    for (final cursor in activeCursors) cursor.baseOffset,
+  ];
 
   EditorTextOperation? _operationFromDiff(String oldText, String newText) {
     if (oldText == newText) return null;
@@ -156,4 +317,10 @@ class WhiskEditorController extends TextEditingController {
       baseStyle: style ?? const TextStyle(),
     );
   }
+}
+
+class _CursorEdit {
+  _CursorEdit({required this.offset, required this.length});
+  final int offset;
+  final int length;
 }

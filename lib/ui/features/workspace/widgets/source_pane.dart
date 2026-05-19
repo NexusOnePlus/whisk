@@ -40,6 +40,10 @@ class _SourcePaneState extends State<SourcePane> {
     height: 1.45,
     color: kTextPrimary,
   );
+  static final _strutStyle = StrutStyle.fromTextStyle(
+    _style,
+    forceStrutHeight: true,
+  );
 
   static double? _cachedCharWidth;
   static double get _charWidth {
@@ -47,6 +51,7 @@ class _SourcePaneState extends State<SourcePane> {
     final tp = TextPainter(
       text: TextSpan(text: '-' * 100, style: _style),
       textDirection: TextDirection.ltr,
+      strutStyle: _strutStyle,
     )..layout();
     _cachedCharWidth = tp.width / 100;
     return _cachedCharWidth!;
@@ -252,6 +257,14 @@ class _EditorStack extends StatefulWidget {
   State<_EditorStack> createState() => _EditorStackState();
 }
 
+class _UndoIntent extends Intent {
+  const _UndoIntent();
+}
+
+class _RedoIntent extends Intent {
+  const _RedoIntent();
+}
+
 class _EditorStackState extends State<_EditorStack> {
   int? _dragAnchorOffset;
   bool _isMouseSelecting = false;
@@ -263,56 +276,77 @@ class _EditorStackState extends State<_EditorStack> {
     final contentHeight = (widget.controller.buffer.lineCount * lineHeight + 40)
         .clamp(widget.viewportHeight, double.infinity);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onDoubleTapDown: _handleDoubleTapDown,
-      child: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: _handlePointerDown,
-        onPointerMove: _handlePointerMove,
-        onPointerUp: _handlePointerUp,
-        onPointerCancel: (_) => _stopSelecting(),
-        child: SizedBox(
-          width: widget.contentWidth,
-          height: contentHeight,
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 24, 24),
-                child: IgnorePointer(
-                  child: EditableText(
-                    controller: widget.controller,
-                    focusNode: widget.focusNode,
-                    style: widget.style,
-                    cursorColor: Colors.transparent,
-                    backgroundCursorColor: kTextMuted,
-                    selectionColor: Colors.transparent,
-                    selectionControls: materialTextSelectionControls,
-                    keyboardType: TextInputType.multiline,
-                    textInputAction: TextInputAction.newline,
-                    maxLines: null,
-                    minLines: null,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    scrollPhysics: const NeverScrollableScrollPhysics(),
-                    onChanged: widget.onChanged,
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Padding(
+    return Shortcuts(
+      shortcuts: {
+        SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+            const _UndoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyZ, control: true, shift: true):
+            const _RedoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyY, control: true):
+            const _RedoIntent(),
+      },
+      child: Actions(
+        actions: {
+          _UndoIntent: CallbackAction<_UndoIntent>(
+            onInvoke: (_) => widget.controller.undoEdit(),
+          ),
+          _RedoIntent: CallbackAction<_RedoIntent>(
+            onInvoke: (_) => widget.controller.redoEdit(),
+          ),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onDoubleTapDown: _handleDoubleTapDown,
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: _handlePointerDown,
+            onPointerMove: _handlePointerMove,
+            onPointerUp: _handlePointerUp,
+            onPointerCancel: (_) => _stopSelecting(),
+            child: SizedBox(
+              width: widget.contentWidth,
+              height: contentHeight,
+              child: Stack(
+                children: [
+                  Padding(
                     padding: const EdgeInsets.fromLTRB(18, 16, 24, 24),
-                    child: CustomPaint(
-                      painter: _EditorOverlayPainter(
+                    child: IgnorePointer(
+                      child: EditableText(
                         controller: widget.controller,
+                        focusNode: widget.focusNode,
                         style: widget.style,
+                        strutStyle: _SourcePaneState._strutStyle,
+                        cursorColor: Colors.transparent,
+                        backgroundCursorColor: kTextMuted,
+                        selectionColor: Colors.transparent,
+                        selectionControls: materialTextSelectionControls,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
+                        maxLines: null,
+                        minLines: null,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        scrollPhysics: const NeverScrollableScrollPhysics(),
+                        onChanged: widget.onChanged,
                       ),
                     ),
                   ),
-                ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 16, 24, 24),
+                        child: CustomPaint(
+                          painter: _EditorOverlayPainter(
+                            controller: widget.controller,
+                            style: widget.style,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -329,7 +363,13 @@ class _EditorStackState extends State<_EditorStack> {
     if (event.buttons == kPrimaryMouseButton) {
       _isMouseSelecting = true;
       _dragAnchorOffset = offset;
-      widget.controller.selection = TextSelection.collapsed(offset: offset);
+      if (HardwareKeyboard.instance.isControlPressed) {
+        widget.controller.toggleActiveCursor(offset);
+        widget.controller.selection = TextSelection.collapsed(offset: offset);
+      } else {
+        widget.controller.clearActiveCursors();
+        widget.controller.selection = TextSelection.collapsed(offset: offset);
+      }
     }
   }
 
@@ -376,26 +416,10 @@ class _EditorStackState extends State<_EditorStack> {
     final x = (localPosition.dx - 18).clamp(0.0, double.infinity);
     final y = (localPosition.dy - 16).clamp(0.0, double.infinity);
     final line = (y / lineHeight).floor();
-
-    final text = widget.controller.text;
-    if (text.isEmpty) return 0;
-
-    final buffer = widget.controller.buffer;
-    if (line >= buffer.lineCount) return text.length;
-
-    final lineText = buffer.lineText(line);
-    final lineStartOffset = buffer.offsetForPosition(
-      EditorTextPosition(line: line, column: 0),
+    final column = (x / _SourcePaneState._charWidth).round();
+    return widget.controller.buffer.offsetForPosition(
+      EditorTextPosition(line: line, column: column),
     );
-
-    final tp = TextPainter(
-      text: TextSpan(text: lineText, style: widget.style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final pos = tp.getPositionForOffset(Offset(x, 0.0));
-    final column = pos.offset.clamp(0, lineText.length);
-
-    return lineStartOffset + column;
   }
 
   ({int start, int end}) _wordRangeAt(int offset) {
@@ -470,9 +494,10 @@ class _LineGutter extends StatelessWidget {
                   child: Text(
                     '${index + 1}',
                     style: const TextStyle(
+                      height: 1.45,
                       color: kTextMuted,
                       fontFamily: 'Consolas',
-                      fontSize: 12,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -502,6 +527,7 @@ class _EditorOverlayPainter extends CustomPainter {
         baseStyle: style,
       ),
       textDirection: TextDirection.ltr,
+      strutStyle: _SourcePaneState._strutStyle,
     )..layout(maxWidth: size.width);
 
     final primarySelectionPaint = Paint()
@@ -536,6 +562,17 @@ class _EditorOverlayPainter extends CustomPainter {
           paint: primarySelectionPaint,
         );
       }
+    }
+
+    for (final cursor in controller.activeCursors) {
+      final offset = cursor.isCollapsed ? cursor.start : cursor.start;
+      _paintCaret(
+        canvas,
+        textPainter,
+        offset: offset.clamp(0, text.length),
+        height: lineHeight,
+        paint: primaryCaretPaint,
+      );
     }
 
     for (final selection in controller.secondarySelections) {
