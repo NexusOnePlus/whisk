@@ -12,12 +12,16 @@ class DashboardScreen extends StatefulWidget {
     required this.onOpenLatexProject,
     required this.onOpenLocalCollaboration,
     required this.onJoinSharedWorkspace,
+    this.activeWorkspaceTitle,
+    this.onResumeActiveWorkspace,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
   final VoidCallback onOpenLocalCollaboration;
   final Future<bool> Function(String invite) onJoinSharedWorkspace;
+  final String? activeWorkspaceTitle;
+  final VoidCallback? onResumeActiveWorkspace;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -86,6 +90,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         widget.onOpenLocalCollaboration,
                                     onJoinSharedWorkspace:
                                         widget.onJoinSharedWorkspace,
+                                    activeWorkspaceTitle:
+                                        widget.activeWorkspaceTitle,
+                                    onResumeActiveWorkspace:
+                                        widget.onResumeActiveWorkspace,
                                   )
                                 : _WideDashboard(
                                     onOpenDraftWorkspace:
@@ -96,6 +104,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         widget.onOpenLocalCollaboration,
                                     onJoinSharedWorkspace:
                                         widget.onJoinSharedWorkspace,
+                                    activeWorkspaceTitle:
+                                        widget.activeWorkspaceTitle,
+                                    onResumeActiveWorkspace:
+                                        widget.onResumeActiveWorkspace,
                                   ),
                           ],
                         ),
@@ -254,12 +266,16 @@ class _WideDashboard extends StatelessWidget {
     required this.onOpenLatexProject,
     required this.onOpenLocalCollaboration,
     required this.onJoinSharedWorkspace,
+    this.activeWorkspaceTitle,
+    this.onResumeActiveWorkspace,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
   final VoidCallback onOpenLocalCollaboration;
   final Future<bool> Function(String invite) onJoinSharedWorkspace;
+  final String? activeWorkspaceTitle;
+  final VoidCallback? onResumeActiveWorkspace;
 
   @override
   Widget build(BuildContext context) {
@@ -277,10 +293,13 @@ class _WideDashboard extends StatelessWidget {
         Expanded(
           flex: 2,
           child: Column(
-            children: const [
-              _OpenProjectsCard(),
-              SizedBox(height: 18),
-              _RecentFilesCard(),
+            children: [
+              _OpenProjectsCard(
+                activeWorkspaceTitle: activeWorkspaceTitle,
+                onResumeActiveWorkspace: onResumeActiveWorkspace,
+              ),
+              const SizedBox(height: 18),
+              const _RecentFilesCard(),
             ],
           ),
         ),
@@ -303,12 +322,16 @@ class _CompactDashboard extends StatelessWidget {
     required this.onOpenLatexProject,
     required this.onOpenLocalCollaboration,
     required this.onJoinSharedWorkspace,
+    this.activeWorkspaceTitle,
+    this.onResumeActiveWorkspace,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
   final VoidCallback onOpenLocalCollaboration;
   final Future<bool> Function(String invite) onJoinSharedWorkspace;
+  final String? activeWorkspaceTitle;
+  final VoidCallback? onResumeActiveWorkspace;
 
   @override
   Widget build(BuildContext context) {
@@ -319,7 +342,10 @@ class _CompactDashboard extends StatelessWidget {
           onOpenLatexProject: onOpenLatexProject,
         ),
         const SizedBox(height: 16),
-        const _OpenProjectsCard(),
+        _OpenProjectsCard(
+          activeWorkspaceTitle: activeWorkspaceTitle,
+          onResumeActiveWorkspace: onResumeActiveWorkspace,
+        ),
         const SizedBox(height: 16),
         const _RecentFilesCard(),
         const SizedBox(height: 16),
@@ -530,16 +556,34 @@ class _CreateProjectRow extends StatelessWidget {
 }
 
 class _OpenProjectsCard extends StatelessWidget {
-  const _OpenProjectsCard();
+  const _OpenProjectsCard({
+    this.activeWorkspaceTitle,
+    this.onResumeActiveWorkspace,
+  });
+
+  final String? activeWorkspaceTitle;
+  final VoidCallback? onResumeActiveWorkspace;
 
   @override
   Widget build(BuildContext context) {
+    final activeTitle = activeWorkspaceTitle;
     return DashboardCard(
       title: 'Open Projects',
       trailing: const Icon(Icons.open_in_new, color: kTextSecondary, size: 18),
       child: Column(
-        children: const [
-          _SectionLabel('LaTeX'),
+        children: [
+          if (activeTitle != null) ...[
+            const _SectionLabel('Active'),
+            _ProjectRow(
+              title: activeTitle,
+              subtitle: 'session active',
+              status: 'resume',
+              accent: kAccentBlue,
+              onTap: onResumeActiveWorkspace,
+            ),
+            const SizedBox(height: 12),
+          ],
+          const _SectionLabel('LaTeX'),
           _ProjectRow(
             title: 'Thesis Draft',
             subtitle: 'local',
@@ -598,7 +642,8 @@ class _ProjectRow extends StatelessWidget {
     required this.subtitle,
     required this.status,
     required this.accent,
-  }) : onTap = null;
+    this.onTap,
+  });
 
   final String title;
   final String subtitle;

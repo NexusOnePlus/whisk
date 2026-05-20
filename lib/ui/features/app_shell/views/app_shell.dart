@@ -36,10 +36,12 @@ class _AppShellState extends State<AppShell> {
             onOpenLatexProject: viewModel.openLatexProject,
             onOpenLocalCollaboration: viewModel.openLocalCollaborationDemo,
             onJoinSharedWorkspace: viewModel.joinSharedWorkspace,
+            activeWorkspaceTitle: viewModel.activeWorkspaceTitle,
+            onResumeActiveWorkspace: viewModel.resumeActiveWorkspace,
           ),
           AppShellMode.workspace => WorkspaceScreen(
             viewModel: viewModel.workspaceViewModel!,
-            onCloseWorkspace: viewModel.closeWorkspace,
+            onCloseWorkspace: viewModel.showDashboard,
           ),
           AppShellMode.localCollaboration => _LocalCollaborationWorkspace(
             viewModel: viewModel,

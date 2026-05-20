@@ -27,6 +27,14 @@ class AppShellViewModel extends ChangeNotifier {
 
   AppShellMode get mode => _mode;
   WorkspaceViewModel? get workspaceViewModel => _workspaceViewModel;
+  String? get activeWorkspaceTitle {
+    final workspace = _workspaceViewModel;
+    if (workspace == null) return null;
+    final root = workspace.activeFile.projectRoot;
+    if (root == null) return 'Shared workspace';
+    return root.split(RegExp(r'[\\/]')).last;
+  }
+
   List<WorkspaceViewModel> get collaborationViewModels =>
       List.unmodifiable(_collaborationViewModels);
 
@@ -164,6 +172,19 @@ class AppShellViewModel extends ChangeNotifier {
     _mode = AppShellMode.workspace;
     notifyListeners();
     return true;
+  }
+
+  void showDashboard() {
+    if (_disposed) return;
+    _mode = AppShellMode.dashboard;
+    notifyListeners();
+  }
+
+  void resumeActiveWorkspace() {
+    if (_disposed) return;
+    if (_workspaceViewModel == null) return;
+    _mode = AppShellMode.workspace;
+    notifyListeners();
   }
 
   void closeWorkspace() {

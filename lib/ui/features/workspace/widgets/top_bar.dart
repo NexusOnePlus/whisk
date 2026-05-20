@@ -39,7 +39,7 @@ class TopBar extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
-              tooltip: 'Close workspace',
+              tooltip: 'Back to dashboard',
               onPressed: onCloseWorkspace,
               icon: const Icon(Icons.arrow_back),
               color: kTextSecondary,
