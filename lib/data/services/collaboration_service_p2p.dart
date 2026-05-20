@@ -54,6 +54,8 @@ class CollaborationServiceP2p
   final CollaborationTransport _transport;
   final bool _useRustEngine;
   CollaborationEngine? _engine;
+  String? _invite;
+  String? _joinedInvite;
   bool _isConnecting = false;
   var _connected = false;
 
@@ -71,7 +73,7 @@ class CollaborationServiceP2p
     try {
       if (_useRustEngine) {
         _engine = CollaborationEngine();
-        await _engine!.startSession();
+        _invite = await _engine!.startSession();
       }
       await _transport.connect(workspaceId: workspaceId, client: this);
       _connected = true;
@@ -83,8 +85,11 @@ class CollaborationServiceP2p
   @override
   Future<void> disconnect() async {
     await _transport.disconnect();
+    await _engine?.closeSession();
     _engine?.dispose();
     _engine = null;
+    _invite = null;
+    _joinedInvite = null;
     _connected = false;
     _peerController.add([]);
   }
@@ -95,6 +100,30 @@ class CollaborationServiceP2p
     final snapshot = await _transport.loadFileSnapshot(filePath, localContent);
     engine?.loadFileSnapshot(filePath: filePath, text: snapshot);
     return snapshot;
+  }
+
+  @override
+  Future<String?> createInvite() async {
+    if (!_useRustEngine) return null;
+    final engine = _engine;
+    if (engine == null) return null;
+    if (_invite == null || _invite!.isEmpty) {
+      _invite = await engine.startSession();
+    }
+    return _invite!.isEmpty ? null : _invite;
+  }
+
+  @override
+  Future<bool> joinInvite(String invite) async {
+    if (!_useRustEngine) return false;
+    if (invite.trim().isEmpty) return false;
+    _joinedInvite = invite.trim();
+    final engine = _engine;
+    if (engine == null) return false;
+    return engine.sendBytesToInvite(
+      invite: _joinedInvite!,
+      payload: [for (final codeUnit in 'hello:$peerId'.codeUnits) codeUnit],
+    );
   }
 
   @override

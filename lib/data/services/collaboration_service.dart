@@ -9,6 +9,8 @@ abstract class CollaborationService {
   Future<void> connect(String workspaceId);
   Future<void> disconnect();
   Future<String> loadFileSnapshot(String filePath, String localContent);
+  Future<String?> createInvite();
+  Future<bool> joinInvite(String invite);
 
   void updateLocalCursor(
     String filePath,

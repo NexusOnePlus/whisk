@@ -47,6 +47,16 @@ class CollaborationServiceMock implements CollaborationService {
   }
 
   @override
+  Future<String?> createInvite() async {
+    return null;
+  }
+
+  @override
+  Future<bool> joinInvite(String invite) async {
+    return false;
+  }
+
+  @override
   void updateLocalCursor(
     String filePath,
     int offset, {
