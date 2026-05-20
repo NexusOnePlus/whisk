@@ -59,6 +59,9 @@ class CollaborationServiceP2p
   CollaborationEngine? _engine;
   String? _invite;
   String? _joinedInvite;
+  final _remoteInvites = <String, String>{};
+  List<CollaborationPeer> _localTransportPeers = const [];
+  List<CollaborationPeer> _irohPeers = const [];
   Timer? _irohInboxTimer;
   bool _isConnecting = false;
   var _connected = false;
@@ -97,6 +100,9 @@ class CollaborationServiceP2p
     _engine = null;
     _invite = null;
     _joinedInvite = null;
+    _remoteInvites.clear();
+    _localTransportPeers = const [];
+    _irohPeers = const [];
     _connected = false;
     _peerController.add([]);
   }
@@ -127,9 +133,22 @@ class CollaborationServiceP2p
     _joinedInvite = invite.trim();
     final engine = _engine;
     if (engine == null) return false;
+    return _sendHelloToInvite(engine: engine, invite: _joinedInvite!);
+  }
+
+  Future<bool> _sendHelloToInvite({
+    required CollaborationEngine engine,
+    required String invite,
+  }) async {
+    final localInvite = await createInvite();
+    if (localInvite == null) return false;
     return engine.sendBytesToInvite(
-      invite: _joinedInvite!,
-      payload: [for (final codeUnit in 'hello:$peerId'.codeUnits) codeUnit],
+      invite: invite,
+      payload: _encodeIrohEnvelope(
+        type: 'hello',
+        peerId: peerId,
+        invite: localInvite,
+      ),
     );
   }
 
@@ -184,10 +203,11 @@ class CollaborationServiceP2p
 
   @override
   void publishPeers(List<CollaborationPeer> peers) {
-    _peerController.add([
+    _localTransportPeers = [
       for (final peer in peers)
         if (peer.id != peerId) peer,
-    ]);
+    ];
+    _publishCombinedPeers();
   }
 
   static String _createPeerId() {
@@ -203,14 +223,17 @@ class CollaborationServiceP2p
 
   void _broadcastCrdtUpdate(String filePath) {
     final engine = _engine;
-    final invite = _joinedInvite;
-    if (engine == null || invite == null) return;
+    if (engine == null) return;
 
     final payload = _encodeIrohEnvelope(
+      type: 'crdt_update',
+      peerId: peerId,
       filePath: filePath,
       update: engine.encodeFullUpdate(filePath: filePath),
     );
-    unawaited(engine.sendBytesToInvite(invite: invite, payload: payload));
+    for (final invite in _activeRemoteInvites()) {
+      unawaited(engine.sendBytesToInvite(invite: invite, payload: payload));
+    }
   }
 
   void _startIrohInboxPolling() {
@@ -227,21 +250,27 @@ class CollaborationServiceP2p
     for (final payload in engine.drainReceivedBytes()) {
       final envelope = _decodeIrohEnvelope(payload);
       if (envelope == null) continue;
+      if (envelope.type == 'hello') {
+        _handleIrohHello(envelope);
+        continue;
+      }
+      if (envelope.type != 'crdt_update') continue;
+      if (envelope.filePath == null || envelope.update == null) continue;
 
-      final oldText = engine.getText(filePath: envelope.filePath);
+      final oldText = engine.getText(filePath: envelope.filePath!);
       if (!engine.applyRemoteUpdate(
-        filePath: envelope.filePath,
-        update: envelope.update,
+        filePath: envelope.filePath!,
+        update: envelope.update!,
       )) {
         continue;
       }
-      final newText = engine.getText(filePath: envelope.filePath);
+      final newText = engine.getText(filePath: envelope.filePath!);
       final operation = _operationFromDiff(oldText, newText);
       if (operation == null) continue;
       _textController.add(
         CollaborationTextUpdate(
-          peerId: 'iroh-remote',
-          filePath: envelope.filePath,
+          peerId: envelope.peerId ?? 'iroh-remote',
+          filePath: envelope.filePath!,
           operation: operation,
         ),
       );
@@ -249,30 +278,89 @@ class CollaborationServiceP2p
   }
 
   List<int> _encodeIrohEnvelope({
-    required String filePath,
-    required List<int> update,
+    required String type,
+    String? peerId,
+    String? invite,
+    String? filePath,
+    List<int>? update,
   }) {
-    return utf8.encode(
-      jsonEncode({
-        'type': 'crdt_update',
-        'filePath': filePath,
-        'update': base64Encode(update),
-      }),
-    );
+    final payload = <String, Object?>{'type': type};
+    if (peerId != null) payload['peerId'] = peerId;
+    if (invite != null) payload['invite'] = invite;
+    if (filePath != null) payload['filePath'] = filePath;
+    if (update != null) payload['update'] = base64Encode(update);
+    return utf8.encode(jsonEncode(payload));
   }
 
   _IrohEnvelope? _decodeIrohEnvelope(Uint8List payload) {
     try {
       final decoded = jsonDecode(utf8.decode(payload));
       if (decoded is! Map<String, Object?>) return null;
-      if (decoded['type'] != 'crdt_update') return null;
+      final type = decoded['type'];
+      if (type is! String) return null;
+      final peerId = decoded['peerId'];
+      final invite = decoded['invite'];
       final filePath = decoded['filePath'];
       final update = decoded['update'];
-      if (filePath is! String || update is! String) return null;
-      return _IrohEnvelope(filePath: filePath, update: base64Decode(update));
+      return _IrohEnvelope(
+        type: type,
+        peerId: peerId is String ? peerId : null,
+        invite: invite is String ? invite : null,
+        filePath: filePath is String ? filePath : null,
+        update: update is String ? base64Decode(update) : null,
+      );
     } catch (_) {
       return null;
     }
+  }
+
+  void _handleIrohHello(_IrohEnvelope envelope) {
+    final remotePeerId = envelope.peerId;
+    final invite = envelope.invite;
+    if (remotePeerId == null || invite == null) return;
+    if (remotePeerId == peerId) return;
+    final isNewPeer = !_remoteInvites.containsKey(remotePeerId);
+    _remoteInvites[remotePeerId] = invite;
+    _irohPeers = [
+      for (final entry in _remoteInvites.entries)
+        CollaborationPeer(
+          id: entry.key,
+          name: 'Remote ${_shortPeerId(entry.key)}',
+          color: Colors.lightBlueAccent,
+          filePath: '',
+          cursorOffset: 0,
+        ),
+    ];
+    _publishCombinedPeers();
+    if (isNewPeer) {
+      final engine = _engine;
+      if (engine != null) {
+        unawaited(_sendHelloToInvite(engine: engine, invite: invite));
+      }
+    }
+  }
+
+  Iterable<String> _activeRemoteInvites() sync* {
+    final seen = <String>{};
+    final joinedInvite = _joinedInvite;
+    if (joinedInvite != null && seen.add(joinedInvite)) yield joinedInvite;
+    for (final invite in _remoteInvites.values) {
+      if (seen.add(invite)) yield invite;
+    }
+  }
+
+  void _publishCombinedPeers() {
+    final seen = <String>{};
+    final combined = <CollaborationPeer>[];
+    for (final peer in [..._localTransportPeers, ..._irohPeers]) {
+      if (!seen.add(peer.id)) continue;
+      combined.add(peer);
+    }
+    _peerController.add(List.unmodifiable(combined));
+  }
+
+  String _shortPeerId(String value) {
+    return value.substring(0, value.length < 8 ? value.length : 8);
   }
 
   EditorTextOperation? _operationFromDiff(String oldText, String newText) {
@@ -306,8 +394,17 @@ class CollaborationServiceP2p
 }
 
 class _IrohEnvelope {
-  const _IrohEnvelope({required this.filePath, required this.update});
+  const _IrohEnvelope({
+    required this.type,
+    this.peerId,
+    this.invite,
+    this.filePath,
+    this.update,
+  });
 
-  final String filePath;
-  final Uint8List update;
+  final String type;
+  final String? peerId;
+  final String? invite;
+  final String? filePath;
+  final Uint8List? update;
 }
