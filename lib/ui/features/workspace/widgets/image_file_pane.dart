@@ -14,7 +14,8 @@ class ImageFilePane extends StatefulWidget {
 }
 
 class _ImageFilePaneState extends State<ImageFilePane> {
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
   int? _width;
   int? _height;
   int _fileSizeBytes = 0;
@@ -98,14 +99,21 @@ class _ImageFilePaneState extends State<ImageFilePane> {
                 opacity: 0.8,
                 blur: 24,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: kBorder),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.image_outlined, color: kAccentBlue, size: 20),
+                      const Icon(
+                        Icons.image_outlined,
+                        color: kAccentBlue,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -139,7 +147,8 @@ class _ImageFilePaneState extends State<ImageFilePane> {
                         color: kTextSecondary,
                         onPressed: () {
                           setState(() {
-                            _transformationController.value = Matrix4.identity();
+                            _transformationController.value =
+                                Matrix4.identity();
                           });
                         },
                       ),

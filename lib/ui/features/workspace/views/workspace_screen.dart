@@ -346,7 +346,7 @@ class _FindBar extends StatelessWidget {
                   hintText: 'Find in file',
                   hintStyle: const TextStyle(color: kTextMuted, fontSize: 12),
                   filled: true,
-                  fillColor: kGlassBase.withOpacity(0.4),
+                  fillColor: kGlassBase.withValues(alpha: 0.4),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),
                     borderSide: const BorderSide(color: kBorder),
@@ -431,10 +431,7 @@ class _WorkspaceBody extends StatelessWidget {
     } else if (active.isPdf) {
       editor = Container(
         color: kAppBlack,
-        child: PdfViewer.file(
-          active.path,
-          key: ValueKey(active.path),
-        ),
+        child: PdfViewer.file(active.path, key: ValueKey(active.path)),
       );
     } else {
       editor = SourcePane(

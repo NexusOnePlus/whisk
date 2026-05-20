@@ -24,7 +24,8 @@ class GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBorderGradient = borderGradient ??
+    final effectiveBorderGradient =
+        borderGradient ??
         const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -38,7 +39,7 @@ class GlassPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
+            color: Colors.black.withValues(alpha: 0.4),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -56,7 +57,7 @@ class GlassPanel extends StatelessWidget {
             child: Container(
               padding: padding,
               decoration: BoxDecoration(
-                color: kGlassBase.withOpacity(opacity),
+                color: kGlassBase.withValues(alpha: opacity),
                 borderRadius: BorderRadius.circular(borderRadius),
               ),
               child: child,

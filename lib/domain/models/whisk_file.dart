@@ -16,13 +16,13 @@ class WhiskFile {
   final bool isDirty;
 
   bool get isImage => const {
-        '.png',
-        '.jpg',
-        '.jpeg',
-        '.gif',
-        '.bmp',
-        '.webp',
-      }.contains(extension.toLowerCase());
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.bmp',
+    '.webp',
+  }.contains(extension.toLowerCase());
 
   bool get isPdf => extension.toLowerCase() == '.pdf';
 

@@ -77,13 +77,16 @@ class _ProjectHeader extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: kGlassBase.withOpacity(0.4),
+              color: kGlassBase.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(13),
               border: Border.all(color: kAccentBlue.withValues(alpha: 0.3)),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [kAccentBlue.withValues(alpha: 0.15), Colors.transparent],
+                colors: [
+                  kAccentBlue.withValues(alpha: 0.15),
+                  Colors.transparent,
+                ],
               ),
             ),
             child: Icon(environment.icon, color: kAccentBlue, size: 22),
@@ -316,7 +319,9 @@ class _FilesSection extends StatelessWidget {
             detail: _detailFor(projectFile),
             selected: projectFile.path == file.path,
             onTap: () => onOpenFile(projectFile),
-            onDelete: projectFile.projectRoot != null ? () => _handleDeleteFile(context, projectFile) : null,
+            onDelete: projectFile.projectRoot != null
+                ? () => _handleDeleteFile(context, projectFile)
+                : null,
           ),
       ],
     );
@@ -342,7 +347,8 @@ class _FilesSection extends StatelessWidget {
       context: context,
       builder: (context) => GlassConfirmDialog(
         title: 'Delete File',
-        message: 'Are you sure you want to delete ${target.name}? This action cannot be undone.',
+        message:
+            'Are you sure you want to delete ${target.name}? This action cannot be undone.',
         confirmLabel: 'Delete',
       ),
     ).then((confirmed) {
@@ -475,7 +481,7 @@ class _FileRow extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 16),
                   color: kTextMuted,
-                  hoverColor: kDangerRed.withOpacity(0.1),
+                  hoverColor: kDangerRed.withValues(alpha: 0.1),
                   tooltip: 'Delete file',
                   onPressed: onDelete,
                 ),
@@ -593,7 +599,10 @@ class GlassInputDialog extends StatelessWidget {
     final controller = TextEditingController(text: initialValue);
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 40.0,
+        vertical: 24.0,
+      ),
       child: GlassPanel(
         borderRadius: 16,
         opacity: 0.8,
@@ -627,7 +636,7 @@ class GlassInputDialog extends StatelessWidget {
                   hintText: hintText,
                   hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
                   filled: true,
-                  fillColor: kGlassBase.withOpacity(0.4),
+                  fillColor: kGlassBase.withValues(alpha: 0.4),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: kBorder),
@@ -648,7 +657,10 @@ class GlassInputDialog extends StatelessWidget {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel', style: TextStyle(color: kTextMuted, fontSize: 12)),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: kTextMuted, fontSize: 12),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   TextButton(
@@ -659,9 +671,18 @@ class GlassInputDialog extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                     ),
-                    child: Text(confirmLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      confirmLabel,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -715,7 +736,11 @@ class GlassConfirmDialog extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 message,
-                style: const TextStyle(color: kTextSecondary, fontSize: 13, height: 1.35),
+                style: const TextStyle(
+                  color: kTextSecondary,
+                  fontSize: 13,
+                  height: 1.35,
+                ),
               ),
               const SizedBox(height: 20),
               Row(
@@ -723,7 +748,10 @@ class GlassConfirmDialog extends StatelessWidget {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel', style: TextStyle(color: kTextMuted, fontSize: 12)),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: kTextMuted, fontSize: 12),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   TextButton(
@@ -734,9 +762,18 @@ class GlassConfirmDialog extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                     ),
-                    child: Text(confirmLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      confirmLabel,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),

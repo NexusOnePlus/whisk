@@ -9,7 +9,7 @@ ThemeData buildWhiskTheme() {
       seedColor: kAccentBlue,
       brightness: Brightness.dark,
       surface: kGlassBase,
-      surfaceContainer: kGlassBase.withOpacity(0.8),
+      surfaceContainer: kGlassBase.withValues(alpha: 0.8),
       onSurface: kTextPrimary,
       outline: kBorder,
     ),
@@ -17,7 +17,7 @@ ThemeData buildWhiskTheme() {
     fontFamily: 'Inter',
     fontFamilyFallback: const ['Segoe UI', 'sans-serif'],
     cardTheme: CardThemeData(
-      color: kGlassBase.withOpacity(0.7),
+      color: kGlassBase.withValues(alpha: 0.7),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       elevation: 0,
     ),

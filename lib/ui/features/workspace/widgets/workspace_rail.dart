@@ -84,12 +84,9 @@ class _RailMark extends StatelessWidget {
       decoration: BoxDecoration(
         color: kGlassHighlight,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kAccentBlue.withOpacity(0.3)),
+        border: Border.all(color: kAccentBlue.withValues(alpha: 0.3)),
         boxShadow: [
-          BoxShadow(
-            color: kAccentBlue.withOpacity(0.1),
-            blurRadius: 8,
-          ),
+          BoxShadow(color: kAccentBlue.withValues(alpha: 0.1), blurRadius: 8),
         ],
       ),
       child: const Icon(Icons.auto_awesome, color: kAccentBlue, size: 22),

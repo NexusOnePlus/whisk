@@ -19,7 +19,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _glowController;
 
   @override
@@ -73,12 +74,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             const SizedBox(height: 24),
                             compact
                                 ? _CompactDashboard(
-                                    onOpenDraftWorkspace: widget.onOpenDraftWorkspace,
-                                    onOpenLatexProject: widget.onOpenLatexProject,
+                                    onOpenDraftWorkspace:
+                                        widget.onOpenDraftWorkspace,
+                                    onOpenLatexProject:
+                                        widget.onOpenLatexProject,
                                   )
                                 : _WideDashboard(
-                                    onOpenDraftWorkspace: widget.onOpenDraftWorkspace,
-                                    onOpenLatexProject: widget.onOpenLatexProject,
+                                    onOpenDraftWorkspace:
+                                        widget.onOpenDraftWorkspace,
+                                    onOpenLatexProject:
+                                        widget.onOpenLatexProject,
                                   ),
                           ],
                         ),
@@ -103,52 +108,57 @@ class _AmbientGlowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint1 = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          kAccentBlue.withOpacity(0.12),
-          kAccentBlue.withOpacity(0.0),
-        ],
-      ).createShader(
-        Rect.fromCircle(
-          center: Offset(
-            size.width * 0.3 + 50 * math.sin(animationValue * 2 * math.pi),
-            size.height * 0.4 + 60 * math.cos(animationValue * 2 * math.pi),
-          ),
-          radius: size.width * 0.35,
-        ),
-      );
+      ..shader =
+          RadialGradient(
+            colors: [
+              kAccentBlue.withValues(alpha: 0.12),
+              kAccentBlue.withValues(alpha: 0.0),
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(
+                size.width * 0.3 + 50 * math.sin(animationValue * 2 * math.pi),
+                size.height * 0.4 + 60 * math.cos(animationValue * 2 * math.pi),
+              ),
+              radius: size.width * 0.35,
+            ),
+          );
 
     final paint2 = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          kAccentAmber.withOpacity(0.08),
-          kAccentAmber.withOpacity(0.0),
-        ],
-      ).createShader(
-        Rect.fromCircle(
-          center: Offset(
-            size.width * 0.7 + 60 * math.cos(animationValue * 2 * math.pi),
-            size.height * 0.6 + 50 * math.sin(animationValue * 2 * math.pi),
-          ),
-          radius: size.width * 0.4,
-        ),
-      );
+      ..shader =
+          RadialGradient(
+            colors: [
+              kAccentAmber.withValues(alpha: 0.08),
+              kAccentAmber.withValues(alpha: 0.0),
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(
+                size.width * 0.7 + 60 * math.cos(animationValue * 2 * math.pi),
+                size.height * 0.6 + 50 * math.sin(animationValue * 2 * math.pi),
+              ),
+              radius: size.width * 0.4,
+            ),
+          );
 
     final paint3 = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          kSuccessGreen.withOpacity(0.06),
-          kSuccessGreen.withOpacity(0.0),
-        ],
-      ).createShader(
-        Rect.fromCircle(
-          center: Offset(
-            size.width * 0.5 + 80 * math.sin((animationValue + 0.5) * 2 * math.pi),
-            size.height * 0.2 + 40 * math.cos((animationValue + 0.5) * 2 * math.pi),
-          ),
-          radius: size.width * 0.3,
-        ),
-      );
+      ..shader =
+          RadialGradient(
+            colors: [
+              kSuccessGreen.withValues(alpha: 0.06),
+              kSuccessGreen.withValues(alpha: 0.0),
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(
+                size.width * 0.5 +
+                    80 * math.sin((animationValue + 0.5) * 2 * math.pi),
+                size.height * 0.2 +
+                    40 * math.cos((animationValue + 0.5) * 2 * math.pi),
+              ),
+              radius: size.width * 0.3,
+            ),
+          );
 
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint1);
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint2);
@@ -347,8 +357,7 @@ class _HoverableCard extends StatefulWidget {
     required this.child,
     this.onTap,
     this.padding = const EdgeInsets.all(12),
-    this.margin = const EdgeInsets.only(bottom: 10),
-  });
+  }) : margin = const EdgeInsets.only(bottom: 10);
 
   final Widget child;
   final VoidCallback? onTap;
@@ -359,7 +368,8 @@ class _HoverableCard extends StatefulWidget {
   State<_HoverableCard> createState() => _HoverableCardState();
 }
 
-class _HoverableCardState extends State<_HoverableCard> with SingleTickerProviderStateMixin {
+class _HoverableCardState extends State<_HoverableCard>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
 
@@ -390,9 +400,17 @@ class _HoverableCardState extends State<_HoverableCard> with SingleTickerProvide
       child: AnimatedBuilder(
         animation: _animation,
         builder: (context, child) {
-          final transform = Matrix4.translationValues(0, -3 * _animation.value, 0);
+          final transform = Matrix4.translationValues(
+            0,
+            -3 * _animation.value,
+            0,
+          );
           final opacity = 0.4 + 0.2 * _animation.value;
-          final borderColor = Color.lerp(kBorder, kAccentBlue.withOpacity(0.5), _animation.value)!;
+          final borderColor = Color.lerp(
+            kBorder,
+            kAccentBlue.withValues(alpha: 0.5),
+            _animation.value,
+          )!;
 
           return Transform(
             transform: transform,
@@ -405,13 +423,15 @@ class _HoverableCardState extends State<_HoverableCard> with SingleTickerProvide
                   margin: widget.margin,
                   padding: widget.padding,
                   decoration: BoxDecoration(
-                    color: kGlassHighlight.withOpacity(opacity),
+                    color: kGlassHighlight.withValues(alpha: opacity),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: borderColor),
                     boxShadow: _animation.value > 0
                         ? [
                             BoxShadow(
-                              color: kAccentBlue.withOpacity(0.08 * _animation.value),
+                              color: kAccentBlue.withValues(
+                                alpha: 0.08 * _animation.value,
+                              ),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -473,11 +493,7 @@ class _CreateProjectRow extends StatelessWidget {
             ),
           ),
           if (onTap != null)
-            const Icon(
-              Icons.arrow_forward,
-              color: kTextSecondary,
-              size: 18,
-            ),
+            const Icon(Icons.arrow_forward, color: kTextSecondary, size: 18),
         ],
       ),
     );
@@ -553,8 +569,7 @@ class _ProjectRow extends StatelessWidget {
     required this.subtitle,
     required this.status,
     required this.accent,
-    this.onTap,
-  });
+  }) : onTap = null;
 
   final String title;
   final String subtitle;
@@ -626,7 +641,7 @@ class _RecentFilesCard extends StatelessWidget {
 }
 
 class _RecentFileRow extends StatefulWidget {
-  const _RecentFileRow({super.key, required this.name, required this.project});
+  const _RecentFileRow({required this.name, required this.project});
 
   final String name;
   final String project;
@@ -648,7 +663,9 @@ class _RecentFileRowState extends State<_RecentFileRow> {
         height: 42,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: _isHovered ? kGlassHighlight.withOpacity(0.3) : Colors.transparent,
+          color: _isHovered
+              ? kGlassHighlight.withValues(alpha: 0.3)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -705,7 +722,7 @@ class _CollaborationCard extends StatelessWidget {
 }
 
 class _PeerRow extends StatefulWidget {
-  const _PeerRow({super.key, required this.name, required this.detail});
+  const _PeerRow({required this.name, required this.detail});
 
   final String name;
   final String detail;
@@ -727,14 +744,18 @@ class _PeerRowState extends State<_PeerRow> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: _isHovered ? kGlassHighlight.withOpacity(0.3) : Colors.transparent,
+          color: _isHovered
+              ? kGlassHighlight.withValues(alpha: 0.3)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor: _isHovered ? kAccentBlue.withOpacity(0.15) : kGlassHighlight,
+              backgroundColor: _isHovered
+                  ? kAccentBlue.withValues(alpha: 0.15)
+                  : kGlassHighlight,
               child: Icon(
                 Icons.person_outline,
                 color: _isHovered ? kAccentBlue : kTextSecondary,

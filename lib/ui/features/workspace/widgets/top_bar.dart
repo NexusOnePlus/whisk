@@ -135,7 +135,7 @@ class _FileTabPill extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 180),
         padding: const EdgeInsets.symmetric(horizontal: 9),
         decoration: BoxDecoration(
-          color: active ? kGlassHighlight : kAppBlack.withOpacity(0.4),
+          color: active ? kGlassHighlight : kAppBlack.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: active ? (accent ?? kBorder) : kBorder),
           gradient: active
