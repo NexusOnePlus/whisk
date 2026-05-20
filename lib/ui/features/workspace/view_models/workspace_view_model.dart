@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:whisk/data/repositories/environment_catalog.dart';
+import 'package:whisk/data/services/collaboration_service.dart';
 import 'package:whisk/data/services/document_render_service.dart';
 import 'package:whisk/data/services/file_watcher_service.dart';
 import 'package:whisk/data/services/project_open_service.dart';
@@ -13,6 +14,7 @@ import 'package:whisk/domain/models/whisk_file.dart';
 class WorkspaceViewModel extends ChangeNotifier {
   WorkspaceViewModel({
     EnvironmentCatalog catalog = const EnvironmentCatalog(),
+    this.collaborationService,
     this._renderService = const DocumentRenderService(),
     this._watcherService = const FileWatcherService(),
     this._openService = const ProjectOpenService(),
@@ -23,12 +25,15 @@ class WorkspaceViewModel extends ChangeNotifier {
     _projectFiles = projectFiles ?? [_activeFile];
     _openFiles = [_activeFile];
     _initWatcher();
+    _initCollaboration();
   }
 
+  final CollaborationService? collaborationService;
   final DocumentRenderService _renderService;
   final FileWatcherService _watcherService;
   final ProjectOpenService _openService;
   StreamSubscription? _watcherSubscription;
+  StreamSubscription? _remoteTextSubscription;
   final List<EnvironmentKind> _environments;
   late WhiskFile _activeFile;
   late List<WhiskFile> _projectFiles;
@@ -73,7 +78,10 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (_disposed) return;
 
     var next = file;
-    if (next.content.isEmpty && next.projectRoot != null && !next.isImage && !next.isPdf) {
+    if (next.content.isEmpty &&
+        next.projectRoot != null &&
+        !next.isImage &&
+        !next.isPdf) {
       final diskFile = File(next.path);
       if (await diskFile.exists()) {
         next = next.copyWith(content: await diskFile.readAsString());
@@ -128,6 +136,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _watcherSubscription?.cancel();
+    _remoteTextSubscription?.cancel();
     super.dispose();
   }
 
@@ -138,6 +147,20 @@ class WorkspaceViewModel extends ChangeNotifier {
     _watcherSubscription = _watcherService.watchDirectory(root).listen((event) {
       if (_disposed) return;
       _refreshProjectFiles();
+    });
+  }
+
+  void _initCollaboration() {
+    if (collaborationService == null) return;
+
+    _remoteTextSubscription = collaborationService!.remoteTextUpdates.listen((
+      operation,
+    ) {
+      if (_disposed) return;
+      // We will need a way to apply this operation to the active file buffer
+      // without triggering a loop. The WorkspaceViewModel just holds the content,
+      // but the WhiskEditorController holds the buffer. We need an event stream
+      // that the UI can listen to.
     });
   }
 
