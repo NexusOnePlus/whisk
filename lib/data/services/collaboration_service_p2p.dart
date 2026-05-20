@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -8,6 +10,7 @@ import 'package:whisk/data/services/local_collaboration_transport.dart';
 import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/src/rust/api/collaboration.dart';
+import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 
 class CollaborationServiceP2p
     implements CollaborationService, CollaborationTransportClient {
@@ -56,6 +59,7 @@ class CollaborationServiceP2p
   CollaborationEngine? _engine;
   String? _invite;
   String? _joinedInvite;
+  Timer? _irohInboxTimer;
   bool _isConnecting = false;
   var _connected = false;
 
@@ -74,6 +78,7 @@ class CollaborationServiceP2p
       if (_useRustEngine) {
         _engine = CollaborationEngine();
         _invite = await _engine!.startSession();
+        _startIrohInboxPolling();
       }
       await _transport.connect(workspaceId: workspaceId, client: this);
       _connected = true;
@@ -85,6 +90,8 @@ class CollaborationServiceP2p
   @override
   Future<void> disconnect() async {
     await _transport.disconnect();
+    _irohInboxTimer?.cancel();
+    _irohInboxTimer = null;
     await _engine?.closeSession();
     _engine?.dispose();
     _engine = null;
@@ -157,6 +164,7 @@ class CollaborationServiceP2p
         insertedText: update.operation.insertedText,
       ),
     );
+    _broadcastCrdtUpdate(update.filePath);
     _transport.broadcastTextUpdate(update);
   }
 
@@ -192,4 +200,114 @@ class CollaborationServiceP2p
     _peerCounter += 1;
     return _peerCounter;
   }
+
+  void _broadcastCrdtUpdate(String filePath) {
+    final engine = _engine;
+    final invite = _joinedInvite;
+    if (engine == null || invite == null) return;
+
+    final payload = _encodeIrohEnvelope(
+      filePath: filePath,
+      update: engine.encodeFullUpdate(filePath: filePath),
+    );
+    unawaited(engine.sendBytesToInvite(invite: invite, payload: payload));
+  }
+
+  void _startIrohInboxPolling() {
+    _irohInboxTimer?.cancel();
+    _irohInboxTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      _drainIrohInbox();
+    });
+  }
+
+  void _drainIrohInbox() {
+    final engine = _engine;
+    if (engine == null) return;
+
+    for (final payload in engine.drainReceivedBytes()) {
+      final envelope = _decodeIrohEnvelope(payload);
+      if (envelope == null) continue;
+
+      final oldText = engine.getText(filePath: envelope.filePath);
+      if (!engine.applyRemoteUpdate(
+        filePath: envelope.filePath,
+        update: envelope.update,
+      )) {
+        continue;
+      }
+      final newText = engine.getText(filePath: envelope.filePath);
+      final operation = _operationFromDiff(oldText, newText);
+      if (operation == null) continue;
+      _textController.add(
+        CollaborationTextUpdate(
+          peerId: 'iroh-remote',
+          filePath: envelope.filePath,
+          operation: operation,
+        ),
+      );
+    }
+  }
+
+  List<int> _encodeIrohEnvelope({
+    required String filePath,
+    required List<int> update,
+  }) {
+    return utf8.encode(
+      jsonEncode({
+        'type': 'crdt_update',
+        'filePath': filePath,
+        'update': base64Encode(update),
+      }),
+    );
+  }
+
+  _IrohEnvelope? _decodeIrohEnvelope(Uint8List payload) {
+    try {
+      final decoded = jsonDecode(utf8.decode(payload));
+      if (decoded is! Map<String, Object?>) return null;
+      if (decoded['type'] != 'crdt_update') return null;
+      final filePath = decoded['filePath'];
+      final update = decoded['update'];
+      if (filePath is! String || update is! String) return null;
+      return _IrohEnvelope(filePath: filePath, update: base64Decode(update));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  EditorTextOperation? _operationFromDiff(String oldText, String newText) {
+    if (oldText == newText) return null;
+
+    var prefix = 0;
+    final minLength = oldText.length < newText.length
+        ? oldText.length
+        : newText.length;
+    while (prefix < minLength &&
+        oldText.codeUnitAt(prefix) == newText.codeUnitAt(prefix)) {
+      prefix++;
+    }
+
+    var oldSuffix = oldText.length;
+    var newSuffix = newText.length;
+    while (oldSuffix > prefix &&
+        newSuffix > prefix &&
+        oldText.codeUnitAt(oldSuffix - 1) ==
+            newText.codeUnitAt(newSuffix - 1)) {
+      oldSuffix--;
+      newSuffix--;
+    }
+
+    return EditorTextOperation(
+      offset: prefix,
+      deletedText: oldText.substring(prefix, oldSuffix),
+      insertedText: newText.substring(prefix, newSuffix),
+    );
+  }
+}
+
+class _IrohEnvelope {
+  const _IrohEnvelope({required this.filePath, required this.update});
+
+  final String filePath;
+  final Uint8List update;
 }
