@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:whisk/data/services/collaboration_service.dart';
 import 'package:whisk/data/services/collaboration_transport.dart';
 import 'package:whisk/data/services/local_collaboration_transport.dart';
+import 'package:whisk/domain/models/collaboration_file_entry.dart';
 import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/src/rust/api/collaboration.dart';
@@ -48,6 +49,8 @@ class CollaborationServiceP2p
   ];
 
   final _peerController = StreamController<List<CollaborationPeer>>.broadcast();
+  final _fileController =
+      StreamController<List<CollaborationFileEntry>>.broadcast();
   final _textController = StreamController<CollaborationTextUpdate>.broadcast();
 
   @override
@@ -64,6 +67,8 @@ class CollaborationServiceP2p
   final _remoteStateVectors = <String, Map<String, List<int>>>{};
   final _irohLastSeen = <String, DateTime>{};
   final _pendingSnapshotRequests = <String, Completer<String?>>{};
+  Completer<List<CollaborationFileEntry>>? _pendingManifestRequest;
+  List<CollaborationFileEntry> _workspaceFiles = const [];
   CollaborationPeer? _localPresence;
   List<CollaborationPeer> _localTransportPeers = const [];
   List<CollaborationPeer> _irohPeers = const [];
@@ -77,6 +82,10 @@ class CollaborationServiceP2p
 
   @override
   Stream<List<CollaborationPeer>> get peers => _peerController.stream;
+
+  @override
+  Stream<List<CollaborationFileEntry>> get remoteFiles =>
+      _fileController.stream;
 
   @override
   Stream<CollaborationTextUpdate> get remoteTextUpdates =>
@@ -114,6 +123,12 @@ class CollaborationServiceP2p
     _irohPresence.clear();
     _remoteStateVectors.clear();
     _irohLastSeen.clear();
+    _workspaceFiles = const [];
+    final pendingManifest = _pendingManifestRequest;
+    if (pendingManifest != null && !pendingManifest.isCompleted) {
+      pendingManifest.complete(const []);
+    }
+    _pendingManifestRequest = null;
     _localPresence = null;
     _lastPresenceHeartbeat = null;
     for (final completer in _pendingSnapshotRequests.values) {
@@ -161,6 +176,40 @@ class CollaborationServiceP2p
     final engine = _engine;
     if (engine == null) return false;
     return _sendHelloToInvite(engine: engine, invite: _joinedInvite!);
+  }
+
+  @override
+  Future<List<CollaborationFileEntry>> requestRemoteFiles() async {
+    final engine = _engine;
+    final joinedInvite = _joinedInvite;
+    if (engine == null || joinedInvite == null) return const [];
+    final existing = _pendingManifestRequest;
+    if (existing != null) return existing.future;
+
+    final completer = Completer<List<CollaborationFileEntry>>();
+    _pendingManifestRequest = completer;
+    final sent = await engine.sendBytesToInvite(
+      invite: joinedInvite,
+      payload: _encodeIrohEnvelope(type: 'manifest_request', peerId: peerId),
+    );
+    if (!sent && !completer.isCompleted) {
+      completer.complete(const []);
+    }
+
+    try {
+      return await completer.future.timeout(const Duration(seconds: 3));
+    } on TimeoutException {
+      return const [];
+    } finally {
+      if (identical(_pendingManifestRequest, completer)) {
+        _pendingManifestRequest = null;
+      }
+    }
+  }
+
+  @override
+  void updateWorkspaceFiles(List<CollaborationFileEntry> files) {
+    _workspaceFiles = List.unmodifiable(files);
   }
 
   Future<bool> _sendHelloToInvite({
@@ -326,6 +375,14 @@ class CollaborationServiceP2p
         _handleIrohGoodbye(envelope);
         continue;
       }
+      if (envelope.type == 'manifest_request') {
+        _handleManifestRequest(envelope);
+        continue;
+      }
+      if (envelope.type == 'manifest_response') {
+        _handleManifestResponse(envelope);
+        continue;
+      }
       if (envelope.type == 'snapshot_request') {
         _handleSnapshotRequest(envelope);
         continue;
@@ -373,6 +430,7 @@ class CollaborationServiceP2p
     List<int>? update,
     List<int>? stateVector,
     CollaborationPeer? peer,
+    List<CollaborationFileEntry>? files,
   }) {
     final payload = <String, Object?>{'type': type};
     if (peerId != null) payload['peerId'] = peerId;
@@ -393,6 +451,12 @@ class CollaborationServiceP2p
         'selectionEnd': peer.selectionEnd,
       };
     }
+    if (files != null) {
+      payload['files'] = [
+        for (final file in files)
+          {'path': file.path, 'name': file.name, 'extension': file.extension},
+      ];
+    }
     return utf8.encode(jsonEncode(payload));
   }
 
@@ -408,6 +472,7 @@ class CollaborationServiceP2p
       final update = decoded['update'];
       final stateVector = decoded['stateVector'];
       final peer = decoded['peer'];
+      final files = decoded['files'];
       return _IrohEnvelope(
         type: type,
         peerId: peerId is String ? peerId : null,
@@ -416,6 +481,7 @@ class CollaborationServiceP2p
         update: update is String ? base64Decode(update) : null,
         stateVector: stateVector is String ? base64Decode(stateVector) : null,
         peer: peer is Map<String, Object?> ? _decodePeer(peer) : null,
+        files: files is List<Object?> ? _decodeFiles(files) : null,
       );
     } catch (_) {
       return null;
@@ -486,6 +552,34 @@ class CollaborationServiceP2p
     _irohLastSeen.remove(remotePeerId);
     _rebuildIrohPeers();
     _publishCombinedPeers();
+  }
+
+  void _handleManifestRequest(_IrohEnvelope envelope) {
+    final engine = _engine;
+    final remotePeerId = envelope.peerId;
+    if (engine == null || remotePeerId == null) return;
+    final invite = _remoteInvites[remotePeerId];
+    if (invite == null) return;
+    unawaited(
+      engine.sendBytesToInvite(
+        invite: invite,
+        payload: _encodeIrohEnvelope(
+          type: 'manifest_response',
+          peerId: peerId,
+          files: _workspaceFiles,
+        ),
+      ),
+    );
+  }
+
+  void _handleManifestResponse(_IrohEnvelope envelope) {
+    final files = envelope.files;
+    if (files == null) return;
+    _fileController.add(files);
+    final pending = _pendingManifestRequest;
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(files);
+    }
   }
 
   Future<String?> _requestIrohSnapshot(String filePath) async {
@@ -636,6 +730,21 @@ class CollaborationServiceP2p
     );
   }
 
+  List<CollaborationFileEntry> _decodeFiles(List<Object?> values) {
+    final files = <CollaborationFileEntry>[];
+    for (final value in values) {
+      if (value is! Map<String, Object?>) continue;
+      final path = value['path'];
+      final name = value['name'];
+      final extension = value['extension'];
+      if (path is! String || name is! String || extension is! String) continue;
+      files.add(
+        CollaborationFileEntry(path: path, name: name, extension: extension),
+      );
+    }
+    return List.unmodifiable(files);
+  }
+
   void _rebuildIrohPeers() {
     _irohPeers = List.unmodifiable(_irohPresence.values);
   }
@@ -735,6 +844,7 @@ class _IrohEnvelope {
     this.update,
     this.stateVector,
     this.peer,
+    this.files,
   });
 
   final String type;
@@ -744,4 +854,5 @@ class _IrohEnvelope {
   final Uint8List? update;
   final Uint8List? stateVector;
   final CollaborationPeer? peer;
+  final List<CollaborationFileEntry>? files;
 }

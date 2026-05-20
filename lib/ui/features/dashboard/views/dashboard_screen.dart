@@ -11,11 +11,13 @@ class DashboardScreen extends StatefulWidget {
     required this.onOpenDraftWorkspace,
     required this.onOpenLatexProject,
     required this.onOpenLocalCollaboration,
+    required this.onJoinSharedWorkspace,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
   final VoidCallback onOpenLocalCollaboration;
+  final Future<bool> Function(String invite) onJoinSharedWorkspace;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -82,6 +84,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         widget.onOpenLatexProject,
                                     onOpenLocalCollaboration:
                                         widget.onOpenLocalCollaboration,
+                                    onJoinSharedWorkspace:
+                                        widget.onJoinSharedWorkspace,
                                   )
                                 : _WideDashboard(
                                     onOpenDraftWorkspace:
@@ -90,6 +94,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         widget.onOpenLatexProject,
                                     onOpenLocalCollaboration:
                                         widget.onOpenLocalCollaboration,
+                                    onJoinSharedWorkspace:
+                                        widget.onJoinSharedWorkspace,
                                   ),
                           ],
                         ),
@@ -247,11 +253,13 @@ class _WideDashboard extends StatelessWidget {
     required this.onOpenDraftWorkspace,
     required this.onOpenLatexProject,
     required this.onOpenLocalCollaboration,
+    required this.onJoinSharedWorkspace,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
   final VoidCallback onOpenLocalCollaboration;
+  final Future<bool> Function(String invite) onJoinSharedWorkspace;
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +289,7 @@ class _WideDashboard extends StatelessWidget {
           width: 280,
           child: _CollaborationCard(
             onOpenLocalCollaboration: onOpenLocalCollaboration,
+            onJoinSharedWorkspace: onJoinSharedWorkspace,
           ),
         ),
       ],
@@ -293,11 +302,13 @@ class _CompactDashboard extends StatelessWidget {
     required this.onOpenDraftWorkspace,
     required this.onOpenLatexProject,
     required this.onOpenLocalCollaboration,
+    required this.onJoinSharedWorkspace,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
   final VoidCallback onOpenLocalCollaboration;
+  final Future<bool> Function(String invite) onJoinSharedWorkspace;
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +323,10 @@ class _CompactDashboard extends StatelessWidget {
         const SizedBox(height: 16),
         const _RecentFilesCard(),
         const SizedBox(height: 16),
-        _CollaborationCard(onOpenLocalCollaboration: onOpenLocalCollaboration),
+        _CollaborationCard(
+          onOpenLocalCollaboration: onOpenLocalCollaboration,
+          onJoinSharedWorkspace: onJoinSharedWorkspace,
+        ),
       ],
     );
   }
@@ -714,9 +728,30 @@ class _RecentFileRowState extends State<_RecentFileRow> {
 }
 
 class _CollaborationCard extends StatelessWidget {
-  const _CollaborationCard({required this.onOpenLocalCollaboration});
+  const _CollaborationCard({
+    required this.onOpenLocalCollaboration,
+    required this.onJoinSharedWorkspace,
+  });
 
   final VoidCallback onOpenLocalCollaboration;
+  final Future<bool> Function(String invite) onJoinSharedWorkspace;
+
+  Future<void> _joinSharedWorkspace(BuildContext context) async {
+    final invite = await showDialog<String>(
+      context: context,
+      builder: (context) => const _JoinSharedWorkspaceDialog(),
+    );
+    if (invite == null || invite.trim().isEmpty) return;
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final joined = await onJoinSharedWorkspace(invite.trim());
+    if (!context.mounted) return;
+    if (!joined) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Unable to join shared workspace')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -726,6 +761,11 @@ class _CollaborationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _PeerRow(name: 'Local instance', detail: 'current window'),
+          _PeerRow(
+            name: 'Join shared workspace',
+            detail: 'paste an invite from another editor',
+            onTap: () => _joinSharedWorkspace(context),
+          ),
           _PeerRow(
             name: 'Second perspective',
             detail: 'open local realtime test',
@@ -738,6 +778,67 @@ class _CollaborationCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _JoinSharedWorkspaceDialog extends StatefulWidget {
+  const _JoinSharedWorkspaceDialog();
+
+  @override
+  State<_JoinSharedWorkspaceDialog> createState() =>
+      _JoinSharedWorkspaceDialogState();
+}
+
+class _JoinSharedWorkspaceDialogState
+    extends State<_JoinSharedWorkspaceDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Join shared workspace'),
+      content: SizedBox(
+        width: 520,
+        child: TextField(
+          controller: _controller,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: 'Invite',
+            hintText: 'Paste collaboration invite',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: () {
+            final invite = _controller.text.trim();
+            if (invite.isEmpty) return;
+            Navigator.of(context).pop(invite);
+          },
+          icon: const Icon(Icons.link),
+          label: const Text('Join'),
+        ),
+      ],
     );
   }
 }

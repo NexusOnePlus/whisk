@@ -35,6 +35,7 @@ class _AppShellState extends State<AppShell> {
             onOpenDraftWorkspace: viewModel.openDraftWorkspace,
             onOpenLatexProject: viewModel.openLatexProject,
             onOpenLocalCollaboration: viewModel.openLocalCollaborationDemo,
+            onJoinSharedWorkspace: viewModel.joinSharedWorkspace,
           ),
           AppShellMode.workspace => WorkspaceScreen(
             viewModel: viewModel.workspaceViewModel!,

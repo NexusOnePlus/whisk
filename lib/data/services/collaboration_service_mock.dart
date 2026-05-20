@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/collaboration_service.dart';
+import 'package:whisk/domain/models/collaboration_file_entry.dart';
 import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
 
 class CollaborationServiceMock implements CollaborationService {
   final _peerController = StreamController<List<CollaborationPeer>>.broadcast();
+  final _fileController =
+      StreamController<List<CollaborationFileEntry>>.broadcast();
   final _textController = StreamController<CollaborationTextUpdate>.broadcast();
 
   List<CollaborationPeer> _currentPeers = [];
@@ -18,6 +21,10 @@ class CollaborationServiceMock implements CollaborationService {
 
   @override
   Stream<List<CollaborationPeer>> get peers => _peerController.stream;
+
+  @override
+  Stream<List<CollaborationFileEntry>> get remoteFiles =>
+      _fileController.stream;
 
   @override
   Stream<CollaborationTextUpdate> get remoteTextUpdates =>
@@ -58,6 +65,14 @@ class CollaborationServiceMock implements CollaborationService {
   Future<bool> joinInvite(String invite) async {
     return false;
   }
+
+  @override
+  Future<List<CollaborationFileEntry>> requestRemoteFiles() async {
+    return const [];
+  }
+
+  @override
+  void updateWorkspaceFiles(List<CollaborationFileEntry> files) {}
 
   @override
   void updateLocalCursor(

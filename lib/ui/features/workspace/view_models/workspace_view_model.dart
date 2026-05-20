@@ -8,6 +8,7 @@ import 'package:whisk/data/services/collaboration_service.dart';
 import 'package:whisk/data/services/document_render_service.dart';
 import 'package:whisk/data/services/file_watcher_service.dart';
 import 'package:whisk/data/services/project_open_service.dart';
+import 'package:whisk/domain/models/collaboration_file_entry.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
@@ -30,6 +31,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     _openFiles = [_activeFile];
     _initWatcher();
     _initCollaboration();
+    _publishWorkspaceManifest();
   }
 
   final CollaborationService? collaborationService;
@@ -38,6 +40,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   final ProjectOpenService _openService;
   StreamSubscription? _watcherSubscription;
   StreamSubscription? _peersSubscription;
+  StreamSubscription? _remoteFilesSubscription;
   Directory? _guestDraftRoot;
   final _guestDraftPaths = <String, String>{};
   List<CollaborationPeer> _collaborationPeers = const [];
@@ -174,6 +177,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     _disposed = true;
     _watcherSubscription?.cancel();
     _peersSubscription?.cancel();
+    _remoteFilesSubscription?.cancel();
     final guestDraftRoot = _guestDraftRoot;
     if (guestDraftRoot != null) {
       unawaited(_deleteGuestDraftRoot(guestDraftRoot));
@@ -200,6 +204,10 @@ class WorkspaceViewModel extends ChangeNotifier {
       _collaborationPeers = peers;
       notifyListeners();
     });
+    _remoteFilesSubscription = service.remoteFiles.listen((files) {
+      if (_disposed) return;
+      _applyRemoteFileManifest(files);
+    });
 
     unawaited(_connectCollaboration(service));
   }
@@ -208,6 +216,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     final workspaceId = _activeFile.projectRoot ?? _activeFile.path;
     await service.connect(workspaceId);
     if (_disposed) return;
+    _publishWorkspaceManifest();
     await _syncActiveFileSnapshot();
   }
 
@@ -229,6 +238,7 @@ class WorkspaceViewModel extends ChangeNotifier {
           ),
         )
         .toList(growable: false);
+    _publishWorkspaceManifest();
     notifyListeners();
   }
 
@@ -279,6 +289,45 @@ class WorkspaceViewModel extends ChangeNotifier {
     _openFiles = _openFiles
         .map((file) => file.path == replacement.path ? replacement : file)
         .toList(growable: false);
+    _publishWorkspaceManifest();
+  }
+
+  void _publishWorkspaceManifest() {
+    collaborationService?.updateWorkspaceFiles([
+      for (final file in _projectFiles)
+        CollaborationFileEntry(
+          path: file.path,
+          name: file.name,
+          extension: file.extension,
+        ),
+    ]);
+  }
+
+  void _applyRemoteFileManifest(List<CollaborationFileEntry> files) {
+    if (_canWriteLocalFiles || files.isEmpty) return;
+    final previousFiles = {for (final file in _projectFiles) file.path: file};
+    final nextFiles = [
+      for (final file in files)
+        WhiskFile(
+          path: file.path,
+          name: file.name,
+          extension: file.extension,
+          content: previousFiles[file.path]?.content ?? '',
+        ),
+    ];
+    _projectFiles = nextFiles;
+    _openFiles = [
+      for (final file in _openFiles)
+        if (nextFiles.any((candidate) => candidate.path == file.path)) file,
+    ];
+    if (_openFiles.isEmpty && nextFiles.isNotEmpty) {
+      _openFiles = [nextFiles.first];
+    }
+    if (!nextFiles.any((file) => file.path == _activeFile.path)) {
+      _activeFile = nextFiles.first;
+      unawaited(_syncActiveFileSnapshot());
+    }
+    notifyListeners();
   }
 
   void publishLocalTextOperations(List<EditorTextOperation> operations) {

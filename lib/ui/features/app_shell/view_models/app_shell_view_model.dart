@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/collaboration_service_p2p.dart';
 import 'package:whisk/data/services/project_open_service.dart';
+import 'package:whisk/domain/models/whisk_file.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
 
 enum AppShellMode { dashboard, workspace, localCollaboration }
@@ -109,6 +110,60 @@ class AppShellViewModel extends ChangeNotifier {
     if (project.entryFile.extension == '.tex') {
       await workspace.renderActiveFile();
     }
+  }
+
+  Future<bool> joinSharedWorkspace(String invite) async {
+    if (_disposed) return false;
+    final service = CollaborationServiceP2p(peerName: 'Guest');
+    await service.connect('guest-${DateTime.now().microsecondsSinceEpoch}');
+    if (_disposed) {
+      await service.disconnect();
+      return false;
+    }
+    final joined = await service.joinInvite(invite);
+    if (!joined) {
+      await service.disconnect();
+      return false;
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final remoteFiles = await service.requestRemoteFiles();
+    if (_disposed) {
+      await service.disconnect();
+      return false;
+    }
+    final files = remoteFiles.isEmpty
+        ? const [
+            WhiskFile(
+              path: 'shared/main.tex',
+              name: 'main.tex',
+              extension: '.tex',
+              content: '',
+            ),
+          ]
+        : [
+            for (final file in remoteFiles)
+              WhiskFile(
+                path: file.path,
+                name: file.name,
+                extension: file.extension,
+                content: '',
+              ),
+          ];
+
+    _workspaceViewModel?.dispose();
+    for (final workspace in _collaborationViewModels) {
+      workspace.dispose();
+    }
+    _collaborationViewModels = const [];
+    _workspaceViewModel = WorkspaceViewModel(
+      initialFile: files.first,
+      projectFiles: files,
+      collaborationService: service,
+    );
+    _mode = AppShellMode.workspace;
+    notifyListeners();
+    return true;
   }
 
   void closeWorkspace() {

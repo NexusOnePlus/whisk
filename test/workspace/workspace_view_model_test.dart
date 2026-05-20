@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whisk/data/services/collaboration_service.dart';
 import 'package:whisk/data/services/document_render_service.dart';
+import 'package:whisk/domain/models/collaboration_file_entry.dart';
 import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/domain/models/render_result.dart';
@@ -101,6 +102,9 @@ class _GuestAwareCollaborationService implements CollaborationService {
   Stream<List<CollaborationPeer>> get peers => _peersController.stream;
 
   @override
+  Stream<List<CollaborationFileEntry>> get remoteFiles => const Stream.empty();
+
+  @override
   Stream<CollaborationTextUpdate> get remoteTextUpdates =>
       _updatesController.stream;
 
@@ -123,6 +127,14 @@ class _GuestAwareCollaborationService implements CollaborationService {
     _joined = true;
     return true;
   }
+
+  @override
+  Future<List<CollaborationFileEntry>> requestRemoteFiles() async {
+    return const [];
+  }
+
+  @override
+  void updateWorkspaceFiles(List<CollaborationFileEntry> files) {}
 
   @override
   void updateLocalCursor(
