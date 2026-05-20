@@ -12,6 +12,8 @@ class TopBar extends StatelessWidget {
     required this.environment,
     required this.onSelectFile,
     required this.onCloseWorkspace,
+    this.onCreateInvite,
+    this.onJoinInvite,
   });
 
   final WhiskFile file;
@@ -19,6 +21,8 @@ class TopBar extends StatelessWidget {
   final EnvironmentKind environment;
   final ValueChanged<WhiskFile> onSelectFile;
   final VoidCallback onCloseWorkspace;
+  final VoidCallback? onCreateInvite;
+  final VoidCallback? onJoinInvite;
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +81,24 @@ class TopBar extends StatelessWidget {
               tooltip: 'Split layout',
               onPressed: () {},
               icon: const Icon(Icons.view_column_outlined),
+              color: kTextSecondary,
+              iconSize: 19,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+            ),
+            IconButton(
+              tooltip: 'Create collaboration invite',
+              onPressed: onCreateInvite,
+              icon: const Icon(Icons.ios_share),
+              color: kTextSecondary,
+              iconSize: 18,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+            ),
+            IconButton(
+              tooltip: 'Join collaboration invite',
+              onPressed: onJoinInvite,
+              icon: const Icon(Icons.link),
               color: kTextSecondary,
               iconSize: 19,
               constraints: const BoxConstraints.tightFor(width: 34, height: 34),

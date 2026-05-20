@@ -165,6 +165,45 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
   }
 
+  Future<void> _createCollaborationInvite() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final invite = await viewModel.createCollaborationInvite();
+    if (!mounted) return;
+    if (invite == null || invite.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Unable to create collaboration invite')),
+      );
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: invite));
+    if (!mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Collaboration invite copied')),
+    );
+  }
+
+  Future<void> _joinCollaborationInvite() async {
+    final invite = await showDialog<String>(
+      context: context,
+      builder: (context) => const _JoinInviteDialog(),
+    );
+    if (!mounted || invite == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final joined = await viewModel.joinCollaborationInvite(invite);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          joined
+              ? 'Joined collaboration session'
+              : 'Unable to join collaboration session',
+        ),
+      ),
+    );
+  }
+
   void _refreshFindMatches() {
     final query = _findController.text;
     if (query.isEmpty) {
@@ -250,6 +289,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                             environment: viewModel.selectedEnvironment,
                             onSelectFile: viewModel.openFile,
                             onCloseWorkspace: widget.onCloseWorkspace,
+                            onCreateInvite: _createCollaborationInvite,
+                            onJoinInvite: _joinCollaborationInvite,
                           ),
                           if (_findOpen)
                             _FindBar(
@@ -299,6 +340,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                 environment: viewModel.selectedEnvironment,
                                 onSelectFile: viewModel.openFile,
                                 onCloseWorkspace: widget.onCloseWorkspace,
+                                onCreateInvite: _createCollaborationInvite,
+                                onJoinInvite: _joinCollaborationInvite,
                               ),
                               if (_findOpen)
                                 _FindBar(
@@ -450,6 +493,64 @@ class _FindBar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _JoinInviteDialog extends StatefulWidget {
+  const _JoinInviteDialog();
+
+  @override
+  State<_JoinInviteDialog> createState() => _JoinInviteDialogState();
+}
+
+class _JoinInviteDialogState extends State<_JoinInviteDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Join collaboration'),
+      content: SizedBox(
+        width: 520,
+        child: TextField(
+          controller: _controller,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: 'Invite',
+            hintText: 'Paste collaboration invite',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final invite = _controller.text.trim();
+            if (invite.isEmpty) return;
+            Navigator.of(context).pop(invite);
+          },
+          child: const Text('Join'),
+        ),
+      ],
     );
   }
 }

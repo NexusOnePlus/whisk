@@ -143,6 +143,16 @@ class WorkspaceViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String?> createCollaborationInvite() async {
+    if (_disposed) return null;
+    return collaborationService?.createInvite();
+  }
+
+  Future<bool> joinCollaborationInvite(String invite) async {
+    if (_disposed) return false;
+    return collaborationService?.joinInvite(invite) ?? false;
+  }
+
   @override
   void dispose() {
     _disposed = true;
