@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -37,6 +38,8 @@ class WorkspaceViewModel extends ChangeNotifier {
   final ProjectOpenService _openService;
   StreamSubscription? _watcherSubscription;
   StreamSubscription? _peersSubscription;
+  Directory? _guestDraftRoot;
+  final _guestDraftPaths = <String, String>{};
   List<CollaborationPeer> _collaborationPeers = const [];
   final List<EnvironmentKind> _environments;
   late WhiskFile _activeFile;
@@ -143,6 +146,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (!_activeFile.isDirty) return;
     if (_activeFile.projectRoot == null) return;
     if (!_canWriteLocalFiles) {
+      await _saveGuestDraftActiveFile();
       _activeFile = _activeFile.copyWith(isDirty: false);
       _replaceFileInLists(_activeFile);
       notifyListeners();
@@ -175,6 +179,10 @@ class WorkspaceViewModel extends ChangeNotifier {
     _disposed = true;
     _watcherSubscription?.cancel();
     _peersSubscription?.cancel();
+    final guestDraftRoot = _guestDraftRoot;
+    if (guestDraftRoot != null) {
+      unawaited(_deleteGuestDraftRoot(guestDraftRoot));
+    }
     super.dispose();
   }
 
@@ -345,6 +353,42 @@ class WorkspaceViewModel extends ChangeNotifier {
 
   bool get _canWriteLocalFiles =>
       collaborationService?.canWriteLocalFiles ?? true;
+
+  Future<void> _saveGuestDraftActiveFile() async {
+    final file = File(await _guestDraftPathFor(_activeFile));
+    await file.parent.create(recursive: true);
+    await file.writeAsString(_activeFile.content);
+  }
+
+  Future<String> _guestDraftPathFor(WhiskFile file) async {
+    final existing = _guestDraftPaths[file.path];
+    if (existing != null) return existing;
+
+    final root =
+        _guestDraftRoot ??
+        await Directory.systemTemp.createTemp('whisk-guest-');
+    _guestDraftRoot = root;
+    final encodedPath = base64Url.encode(utf8.encode(file.path));
+    final boundedPath = encodedPath.length <= 96
+        ? encodedPath
+        : encodedPath.substring(encodedPath.length - 96);
+    final draftPath =
+        '${root.path}${Platform.pathSeparator}$boundedPath-${file.name}';
+    _guestDraftPaths[file.path] = draftPath;
+    return draftPath;
+  }
+
+  @visibleForTesting
+  String? guestDraftPathForTesting(String filePath) =>
+      _guestDraftPaths[filePath];
+
+  Future<void> _deleteGuestDraftRoot(Directory root) async {
+    try {
+      await root.delete(recursive: true);
+    } on FileSystemException {
+      // Best-effort cleanup for session-local guest drafts.
+    }
+  }
 
   String _applyOperation(String text, EditorTextOperation operation) {
     final start = operation.offset.clamp(0, text.length);

@@ -37,6 +37,9 @@ void main() {
       viewModel.updateActiveContent('guest edit');
       await viewModel.saveActiveFile();
 
+      final guestDraftPath = viewModel.guestDraftPathForTesting(source.path);
+      expect(guestDraftPath, isNotNull);
+      expect(await File(guestDraftPath!).readAsString(), 'guest edit');
       expect(await source.readAsString(), 'host disk');
       expect(viewModel.activeFile.content, 'guest edit');
       expect(viewModel.activeFile.isDirty, isFalse);
