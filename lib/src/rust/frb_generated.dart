@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1000256681;
+  int get rustContentHash => -1571644169;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -81,11 +81,19 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 abstract class RustLibApi extends BaseApi {
   void crateApiCollaborationCollaborationEngineApplyLocalEdit({
     required CollaborationEngine that,
+    required String filePath,
     required RustTextOperation op,
   });
 
   String crateApiCollaborationCollaborationEngineGetText({
     required CollaborationEngine that,
+    required String filePath,
+  });
+
+  void crateApiCollaborationCollaborationEngineLoadFileSnapshot({
+    required CollaborationEngine that,
+    required String filePath,
+    required String text,
   });
 
   CollaborationEngine crateApiCollaborationCollaborationEngineNew();
@@ -119,6 +127,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   void crateApiCollaborationCollaborationEngineApplyLocalEdit({
     required CollaborationEngine that,
+    required String filePath,
     required RustTextOperation op,
   }) {
     return handler.executeSync(
@@ -129,6 +138,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
+          sse_encode_String(filePath, serializer);
           sse_encode_box_autoadd_rust_text_operation(op, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1)!;
         },
@@ -138,7 +148,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiCollaborationCollaborationEngineApplyLocalEditConstMeta,
-        argValues: [that, op],
+        argValues: [that, filePath, op],
         apiImpl: this,
       ),
     );
@@ -148,12 +158,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiCollaborationCollaborationEngineApplyLocalEditConstMeta =>
       const TaskConstMeta(
         debugName: "CollaborationEngine_apply_local_edit",
-        argNames: ["that", "op"],
+        argNames: ["that", "filePath", "op"],
       );
 
   @override
   String crateApiCollaborationCollaborationEngineGetText({
     required CollaborationEngine that,
+    required String filePath,
   }) {
     return handler.executeSync(
       SyncTask(
@@ -163,6 +174,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
+          sse_encode_String(filePath, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
         },
         codec: SseCodec(
@@ -170,7 +182,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiCollaborationCollaborationEngineGetTextConstMeta,
-        argValues: [that],
+        argValues: [that, filePath],
         apiImpl: this,
       ),
     );
@@ -179,7 +191,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiCollaborationCollaborationEngineGetTextConstMeta =>
       const TaskConstMeta(
         debugName: "CollaborationEngine_get_text",
-        argNames: ["that"],
+        argNames: ["that", "filePath"],
+      );
+
+  @override
+  void crateApiCollaborationCollaborationEngineLoadFileSnapshot({
+    required CollaborationEngine that,
+    required String filePath,
+    required String text,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(filePath, serializer);
+          sse_encode_String(text, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineLoadFileSnapshotConstMeta,
+        argValues: [that, filePath, text],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineLoadFileSnapshotConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_load_file_snapshot",
+        argNames: ["that", "filePath", "text"],
       );
 
   @override
@@ -188,7 +237,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -220,7 +269,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -250,7 +299,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -275,7 +324,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -630,14 +679,29 @@ class CollaborationEngineImpl extends RustOpaque
         .rust_arc_decrement_strong_count_CollaborationEnginePtr,
   );
 
-  void applyLocalEdit({required RustTextOperation op}) => RustLib.instance.api
+  void applyLocalEdit({
+    required String filePath,
+    required RustTextOperation op,
+  }) => RustLib.instance.api
       .crateApiCollaborationCollaborationEngineApplyLocalEdit(
         that: this,
+        filePath: filePath,
         op: op,
       );
 
-  String getText() => RustLib.instance.api
-      .crateApiCollaborationCollaborationEngineGetText(that: this);
+  String getText({required String filePath}) =>
+      RustLib.instance.api.crateApiCollaborationCollaborationEngineGetText(
+        that: this,
+        filePath: filePath,
+      );
+
+  void loadFileSnapshot({required String filePath, required String text}) =>
+      RustLib.instance.api
+          .crateApiCollaborationCollaborationEngineLoadFileSnapshot(
+            that: this,
+            filePath: filePath,
+            text: text,
+          );
 
   Future<void> startSession() => RustLib.instance.api
       .crateApiCollaborationCollaborationEngineStartSession(that: this);

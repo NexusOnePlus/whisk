@@ -1,20 +1,24 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/collaboration_service.dart';
-import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 import 'package:whisk/domain/models/collaboration_peer.dart';
+import 'package:whisk/domain/models/collaboration_text_update.dart';
 
 class CollaborationServiceMock implements CollaborationService {
   final _peerController = StreamController<List<CollaborationPeer>>.broadcast();
-  final _textController = StreamController<EditorTextOperation>.broadcast();
+  final _textController = StreamController<CollaborationTextUpdate>.broadcast();
 
   List<CollaborationPeer> _currentPeers = [];
+
+  @override
+  String get peerId => 'mock-local-peer';
 
   @override
   Stream<List<CollaborationPeer>> get peers => _peerController.stream;
 
   @override
-  Stream<EditorTextOperation> get remoteTextUpdates => _textController.stream;
+  Stream<CollaborationTextUpdate> get remoteTextUpdates =>
+      _textController.stream;
 
   @override
   Future<void> connect(String workspaceId) async {
@@ -24,6 +28,7 @@ class CollaborationServiceMock implements CollaborationService {
         id: 'peer-1',
         name: 'Remote Writer',
         color: Colors.purpleAccent,
+        filePath: '',
         cursorOffset: 0,
       ),
     ];
@@ -37,12 +42,22 @@ class CollaborationServiceMock implements CollaborationService {
   }
 
   @override
-  void updateLocalCursor(int offset, {int? selectionStart, int? selectionEnd}) {
+  Future<String> loadFileSnapshot(String filePath, String localContent) async {
+    return localContent;
+  }
+
+  @override
+  void updateLocalCursor(
+    String filePath,
+    int offset, {
+    int? selectionStart,
+    int? selectionEnd,
+  }) {
     // In a real implementation, this would send local state to peers
   }
 
   @override
-  void broadcastTextChange(EditorTextOperation operation) {
+  void broadcastTextChange(CollaborationTextUpdate update) {
     // In a real implementation, this would sync with Yjs
   }
 

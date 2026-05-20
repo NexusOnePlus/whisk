@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
 import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
+import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 
 void main() {
   test('applies text input to active cursors as one undoable transaction', () {
@@ -216,5 +217,51 @@ void main() {
 
     expect(controller.selection.extentOffset, 2);
     expect(controller.activeCursors.map((cursor) => cursor.baseOffset), [2]);
+  });
+
+  test('emits local operations for multi-cursor edits', () async {
+    final controller = WhiskEditorController(
+      text: 'abc\ndef',
+      environmentId: 'latex',
+    );
+    final emitted = <List<EditorTextOperation>>[];
+    final sub = controller.textOperations.listen(emitted.add);
+
+    controller.selection = const TextSelection.collapsed(offset: 1);
+    controller.toggleActiveCursor(5);
+    controller.value = controller.value.copyWith(
+      text: 'aXbc\ndef',
+      selection: const TextSelection.collapsed(offset: 2),
+      composing: TextRange.empty,
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    expect(emitted, hasLength(1));
+    expect(emitted.single.map((op) => op.offset), [5, 1]);
+    expect(emitted.single.map((op) => op.insertedText), ['X', 'X']);
+    await sub.cancel();
+    controller.dispose();
+  });
+
+  test('applies remote operations without emitting local operations', () async {
+    final controller = WhiskEditorController(
+      text: 'abc\ndef',
+      environmentId: 'latex',
+    );
+    final emitted = <List<EditorTextOperation>>[];
+    final sub = controller.textOperations.listen(emitted.add);
+
+    controller.selection = const TextSelection.collapsed(offset: 5);
+    controller.applyRemoteOperation(
+      const EditorTextOperation(offset: 1, deletedText: '', insertedText: 'X'),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.text, 'aXbc\ndef');
+    expect(controller.selection.extentOffset, 6);
+    expect(emitted, isEmpty);
+    expect(controller.undoEdit(), isFalse);
+    await sub.cancel();
+    controller.dispose();
   });
 }

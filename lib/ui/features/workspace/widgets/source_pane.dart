@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
@@ -15,6 +16,7 @@ class SourcePane extends StatefulWidget {
     required this.focusNode,
     required this.revealRevision,
     this.revealOffset,
+    this.remotePeers = const [],
     required this.onChanged,
   });
 
@@ -23,6 +25,7 @@ class SourcePane extends StatefulWidget {
   final FocusNode focusNode;
   final int revealRevision;
   final int? revealOffset;
+  final List<CollaborationPeer> remotePeers;
   final ValueChanged<String> onChanged;
 
   @override
@@ -150,6 +153,7 @@ class _SourcePaneState extends State<SourcePane> {
                               style: _style,
                               contentWidth: editorContentWidth,
                               viewportHeight: _viewportHeight,
+                              remotePeers: widget.remotePeers,
                               onChanged: widget.onChanged,
                             ),
                           ),
@@ -248,6 +252,7 @@ class _EditorStack extends StatefulWidget {
     required this.style,
     required this.contentWidth,
     required this.viewportHeight,
+    required this.remotePeers,
     required this.onChanged,
   });
 
@@ -257,6 +262,7 @@ class _EditorStack extends StatefulWidget {
   final TextStyle style;
   final double contentWidth;
   final double viewportHeight;
+  final List<CollaborationPeer> remotePeers;
   final ValueChanged<String> onChanged;
 
   @override
@@ -519,6 +525,7 @@ class _EditorStackState extends State<_EditorStack> {
                                         painter: _EditorOverlayPainter(
                                           controller: widget.controller,
                                           style: widget.style,
+                                          remotePeers: widget.remotePeers,
                                           visibleRange: (
                                             firstLine: firstLine,
                                             lastLine: lastLine,
@@ -968,11 +975,13 @@ class _EditorOverlayPainter extends CustomPainter {
   _EditorOverlayPainter({
     required this.controller,
     required this.style,
+    required this.remotePeers,
     required this.visibleRange,
   }) : super(repaint: controller);
 
   final WhiskEditorController controller;
   final TextStyle style;
+  final List<CollaborationPeer> remotePeers;
   final ({int firstLine, int lastLine}) visibleRange;
 
   @override
@@ -1103,6 +1112,57 @@ class _EditorOverlayPainter extends CustomPainter {
         paint: secondarySelectionPaint,
       );
     }
+
+    for (final peer in remotePeers) {
+      final cursorOffset = peer.cursorOffset;
+      if (cursorOffset == null) continue;
+      final color = peer.color;
+      final selectionStart = peer.selectionStart;
+      final selectionEnd = peer.selectionEnd;
+      if (selectionStart != null &&
+          selectionEnd != null &&
+          selectionStart != selectionEnd) {
+        final start = selectionStart.clamp(0, text.length);
+        final end = selectionEnd.clamp(0, text.length);
+        final startPos = controller.buffer.positionForOffset(start);
+        final endPos = controller.buffer.positionForOffset(end);
+        if (endPos.line >= visibleRange.firstLine &&
+            startPos.line <= visibleRange.lastLine) {
+          _paintSelection(
+            canvas,
+            selection: TextSelection(baseOffset: start, extentOffset: end),
+            lineHeight: lineHeight,
+            charWidth: charWidth,
+            paint: Paint()..color = color.withValues(alpha: 0.22),
+          );
+        }
+      }
+
+      final offset = cursorOffset.clamp(0, text.length);
+      final position = controller.buffer.positionForOffset(offset);
+      if (position.line < visibleRange.firstLine ||
+          position.line > visibleRange.lastLine) {
+        continue;
+      }
+      _paintCaret(
+        canvas,
+        offset: offset,
+        affinity: TextAffinity.downstream,
+        lineHeight: lineHeight,
+        charWidth: charWidth,
+        height: lineHeight,
+        paint: Paint()
+          ..color = color
+          ..strokeWidth = 2,
+      );
+      _paintPeerLabel(
+        canvas,
+        peer: peer,
+        lineHeight: lineHeight,
+        charWidth: charWidth,
+        color: color,
+      );
+    }
   }
 
   void _paintSelection(
@@ -1162,10 +1222,45 @@ class _EditorOverlayPainter extends CustomPainter {
     canvas.drawLine(caret, caret.translate(0, height), paint);
   }
 
+  void _paintPeerLabel(
+    Canvas canvas, {
+    required CollaborationPeer peer,
+    required double lineHeight,
+    required double charWidth,
+    required Color color,
+  }) {
+    final offset = peer.cursorOffset?.clamp(0, controller.text.length);
+    if (offset == null) return;
+    final position = controller.buffer.positionForOffset(offset);
+    final label = peer.name.trim().isEmpty ? 'Peer' : peer.name.trim();
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: const TextStyle(
+          color: kAppBlack,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          height: 1.0,
+        ),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: 120);
+    final caretX = position.column * charWidth;
+    final top = (position.line * lineHeight - 14).clamp(0.0, double.infinity);
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(caretX, top, textPainter.width + 8, 14),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(rect, Paint()..color = color);
+    textPainter.paint(canvas, Offset(caretX + 4, top + 2));
+  }
+
   @override
   bool shouldRepaint(covariant _EditorOverlayPainter oldDelegate) {
     return oldDelegate.controller != controller ||
         oldDelegate.style != style ||
+        oldDelegate.remotePeers != remotePeers ||
         oldDelegate.visibleRange != visibleRange;
   }
 }

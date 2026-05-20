@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:whisk/ui/features/editor/logic/syntax_highlighter.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_buffer.dart';
@@ -19,14 +21,26 @@ class WhiskEditorController extends TextEditingController {
   String environmentId;
   List<EditorSelectionRange> secondarySelections = const [];
   List<EditorSelectionRange> activeCursors = const [];
+  final _textOperationsController =
+      StreamController<List<EditorTextOperation>>.broadcast();
 
   final List<EditorTextTransaction> _undoStack = [];
   final List<EditorTextTransaction> _redoStack = [];
   var _applyingHistory = false;
   var _syncingFromModel = false;
   var _applyingCursors = false;
+  var _applyingRemote = false;
   String? _textBeforeComposition;
   TextSelection? _selectionBeforeComposition;
+
+  Stream<List<EditorTextOperation>> get textOperations =>
+      _textOperationsController.stream;
+
+  @override
+  void dispose() {
+    _textOperationsController.close();
+    super.dispose();
+  }
 
   @override
   set value(TextEditingValue newValue) {
@@ -82,6 +96,7 @@ class WhiskEditorController extends TextEditingController {
             ),
           );
           _redoStack.clear();
+          _emitOperations([operation]);
         }
       }
     }
@@ -143,6 +158,27 @@ class WhiskEditorController extends TextEditingController {
     _redoStack.clear();
     activeCursors = const [];
     _setValueFromBuffer(selectionOffset: newSelectionOffset);
+    _emitOperations([operation]);
+  }
+
+  void applyRemoteOperation(EditorTextOperation operation) {
+    _applyingRemote = true;
+    try {
+      final transformedSelection = _transformSelection(selection, operation);
+      final transformedActiveCursors = [
+        for (final cursor in activeCursors) _transformRange(cursor, operation),
+      ];
+      buffer.apply(operation);
+      activeCursors = List.unmodifiable(transformedActiveCursors);
+      super.value = TextEditingValue(
+        text: buffer.text,
+        selection: transformedSelection,
+        composing: TextRange.empty,
+      );
+      notifyListeners();
+    } finally {
+      _applyingRemote = false;
+    }
   }
 
   void setSecondarySelections(List<EditorSelectionRange> selections) {
@@ -325,6 +361,7 @@ class WhiskEditorController extends TextEditingController {
       );
       _redoStack.clear();
       activeCursors = newCursors;
+      _emitOperations(operations);
       notifyListeners();
     } finally {
       _applyingCursors = false;
@@ -376,6 +413,7 @@ class WhiskEditorController extends TextEditingController {
     for (final operation in ordered) {
       buffer.apply(operation);
     }
+    _emitOperations(ordered);
   }
 
   void _setValueFromBuffer({
@@ -411,6 +449,51 @@ class WhiskEditorController extends TextEditingController {
       return;
     }
     _undoStack.add(transaction);
+  }
+
+  void _emitOperations(List<EditorTextOperation> operations) {
+    if (_applyingRemote ||
+        _syncingFromModel ||
+        _textOperationsController.isClosed ||
+        operations.isEmpty) {
+      return;
+    }
+    _textOperationsController.add(List.unmodifiable(operations));
+  }
+
+  TextSelection _transformSelection(
+    TextSelection selection,
+    EditorTextOperation operation,
+  ) {
+    if (!selection.isValid) return selection;
+    return TextSelection(
+      baseOffset: _transformOffset(selection.baseOffset, operation),
+      extentOffset: _transformOffset(selection.extentOffset, operation),
+      affinity: selection.affinity,
+      isDirectional: selection.isDirectional,
+    );
+  }
+
+  EditorSelectionRange _transformRange(
+    EditorSelectionRange range,
+    EditorTextOperation operation,
+  ) {
+    return EditorSelectionRange(
+      baseOffset: _transformOffset(range.baseOffset, operation),
+      extentOffset: _transformOffset(range.extentOffset, operation),
+    );
+  }
+
+  int _transformOffset(int offset, EditorTextOperation operation) {
+    final deletedEnd = operation.offset + operation.deletedText.length;
+    final insertedEnd = operation.offset + operation.insertedText.length;
+    if (offset <= operation.offset) return offset.clamp(0, buffer.length);
+    if (offset >= deletedEnd) {
+      final delta =
+          operation.insertedText.length - operation.deletedText.length;
+      return (offset + delta).clamp(0, buffer.length);
+    }
+    return insertedEnd.clamp(0, buffer.length);
   }
 
   EditorSelectionRange _moveRange(

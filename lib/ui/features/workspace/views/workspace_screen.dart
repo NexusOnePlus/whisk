@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
@@ -40,7 +41,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   int _revealRevision = 0;
   int? _revealOffset;
   Timer? _contentSyncTimer;
+  Timer? _presenceSyncTimer;
   String? _pendingContent;
+  StreamSubscription? _operationSubscription;
+  StreamSubscription? _remoteTextSubscription;
 
   WorkspaceViewModel get viewModel => widget.viewModel;
 
@@ -54,6 +58,13 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _editorFocusNode = FocusNode();
     _findController = TextEditingController();
     _findFocusNode = FocusNode();
+    _operationSubscription = _controller.textOperations.listen(
+      viewModel.publishLocalTextOperations,
+    );
+    _remoteTextSubscription = viewModel.remoteTextUpdates?.listen(
+      _handleRemoteTextUpdate,
+    );
+    _controller.addListener(_schedulePresenceSync);
     viewModel.addListener(_syncControllerFromModel);
   }
 
@@ -61,7 +72,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   void dispose() {
     _flushPendingContent();
     _contentSyncTimer?.cancel();
+    _presenceSyncTimer?.cancel();
+    _operationSubscription?.cancel();
+    _remoteTextSubscription?.cancel();
     viewModel.removeListener(_syncControllerFromModel);
+    _controller.removeListener(_schedulePresenceSync);
     _controller.dispose();
     _editorFocusNode.dispose();
     _findController.dispose();
@@ -82,6 +97,32 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _contentSyncTimer?.cancel();
     _contentSyncTimer = Timer(const Duration(milliseconds: 250), () {
       _flushPendingContent();
+    });
+  }
+
+  void _handleRemoteTextUpdate(CollaborationTextUpdate update) {
+    if (update.filePath == viewModel.activeFile.path) {
+      _controller.applyRemoteOperation(update.operation);
+      viewModel.updateActiveContentFromRemote(_controller.text);
+      return;
+    }
+    viewModel.applyRemoteTextUpdate(update);
+  }
+
+  void _schedulePresenceSync() {
+    _presenceSyncTimer?.cancel();
+    _presenceSyncTimer = Timer(const Duration(milliseconds: 16), () {
+      final selection = _controller.selection;
+      if (!selection.isValid) return;
+      viewModel.publishLocalCursor(
+        offset: selection.extentOffset.clamp(0, _controller.text.length),
+        selectionStart: selection.start == selection.end
+            ? null
+            : selection.start.clamp(0, _controller.text.length),
+        selectionEnd: selection.start == selection.end
+            ? null
+            : selection.end.clamp(0, _controller.text.length),
+      );
     });
   }
 
@@ -434,10 +475,14 @@ class _WorkspaceBody extends StatelessWidget {
         child: PdfViewer.file(active.path, key: ValueKey(active.path)),
       );
     } else {
+      final remotePeers = viewModel.collaborationPeers
+          .where((peer) => peer.filePath == active.path)
+          .toList(growable: false);
       editor = SourcePane(
         environment: viewModel.selectedEnvironment,
         controller: controller,
         focusNode: editorFocusNode,
+        remotePeers: remotePeers,
         revealRevision: revealRevision,
         revealOffset: revealOffset,
         onChanged: onEditorChanged,

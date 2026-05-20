@@ -1,13 +1,20 @@
 import 'package:whisk/domain/models/collaboration_peer.dart';
-import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
+import 'package:whisk/domain/models/collaboration_text_update.dart';
 
 abstract class CollaborationService {
+  String get peerId;
   Stream<List<CollaborationPeer>> get peers;
-  Stream<EditorTextOperation> get remoteTextUpdates;
+  Stream<CollaborationTextUpdate> get remoteTextUpdates;
 
   Future<void> connect(String workspaceId);
   Future<void> disconnect();
+  Future<String> loadFileSnapshot(String filePath, String localContent);
 
-  void updateLocalCursor(int offset, {int? selectionStart, int? selectionEnd});
-  void broadcastTextChange(EditorTextOperation operation);
+  void updateLocalCursor(
+    String filePath,
+    int offset, {
+    int? selectionStart,
+    int? selectionEnd,
+  });
+  void broadcastTextChange(CollaborationTextUpdate update);
 }

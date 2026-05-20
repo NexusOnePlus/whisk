@@ -8,8 +8,11 @@ import 'package:whisk/data/services/document_render_service.dart';
 import 'package:whisk/data/services/file_watcher_service.dart';
 import 'package:whisk/data/services/project_open_service.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
+import 'package:whisk/domain/models/collaboration_peer.dart';
+import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
+import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 
 class WorkspaceViewModel extends ChangeNotifier {
   WorkspaceViewModel({
@@ -33,7 +36,8 @@ class WorkspaceViewModel extends ChangeNotifier {
   final FileWatcherService _watcherService;
   final ProjectOpenService _openService;
   StreamSubscription? _watcherSubscription;
-  StreamSubscription? _remoteTextSubscription;
+  StreamSubscription? _peersSubscription;
+  List<CollaborationPeer> _collaborationPeers = const [];
   final List<EnvironmentKind> _environments;
   late WhiskFile _activeFile;
   late List<WhiskFile> _projectFiles;
@@ -50,6 +54,10 @@ class WorkspaceViewModel extends ChangeNotifier {
       _environments[_selectedEnvironmentIndex];
   WhiskFile get activeFile => _activeFile;
   RenderResult get renderResult => _renderResult;
+  List<CollaborationPeer> get collaborationPeers =>
+      List.unmodifiable(_collaborationPeers);
+  Stream<CollaborationTextUpdate>? get remoteTextUpdates =>
+      collaborationService?.remoteTextUpdates;
 
   void selectEnvironment(int index) {
     if (_disposed) return;
@@ -98,6 +106,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     }
     _replaceFileInLists(next);
     _renderResult = const RenderResult.idle();
+    _syncActiveFileSnapshot();
     notifyListeners();
   }
 
@@ -124,8 +133,10 @@ class WorkspaceViewModel extends ChangeNotifier {
   Future<void> saveActiveFile() async {
     if (_disposed) return;
     if (!_activeFile.isDirty) return;
+    if (_activeFile.projectRoot == null) return;
 
     final file = File(_activeFile.path);
+    await file.parent.create(recursive: true);
     await file.writeAsString(_activeFile.content);
     _activeFile = _activeFile.copyWith(isDirty: false);
     _replaceFileInLists(_activeFile);
@@ -136,7 +147,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _watcherSubscription?.cancel();
-    _remoteTextSubscription?.cancel();
+    _peersSubscription?.cancel();
     super.dispose();
   }
 
@@ -151,17 +162,23 @@ class WorkspaceViewModel extends ChangeNotifier {
   }
 
   void _initCollaboration() {
-    if (collaborationService == null) return;
+    final service = collaborationService;
+    if (service == null) return;
 
-    _remoteTextSubscription = collaborationService!.remoteTextUpdates.listen((
-      operation,
-    ) {
+    _peersSubscription = service.peers.listen((peers) {
       if (_disposed) return;
-      // We will need a way to apply this operation to the active file buffer
-      // without triggering a loop. The WorkspaceViewModel just holds the content,
-      // but the WhiskEditorController holds the buffer. We need an event stream
-      // that the UI can listen to.
+      _collaborationPeers = peers;
+      notifyListeners();
     });
+
+    unawaited(_connectCollaboration(service));
+  }
+
+  Future<void> _connectCollaboration(CollaborationService service) async {
+    final workspaceId = _activeFile.projectRoot ?? _activeFile.path;
+    await service.connect(workspaceId);
+    if (_disposed) return;
+    await _syncActiveFileSnapshot();
   }
 
   Future<void> _refreshProjectFiles() async {
@@ -232,6 +249,80 @@ class WorkspaceViewModel extends ChangeNotifier {
     _openFiles = _openFiles
         .map((file) => file.path == replacement.path ? replacement : file)
         .toList(growable: false);
+  }
+
+  void publishLocalTextOperations(List<EditorTextOperation> operations) {
+    final service = collaborationService;
+    if (service == null || operations.isEmpty) return;
+    for (final operation in operations) {
+      service.broadcastTextChange(
+        CollaborationTextUpdate(
+          peerId: service.peerId,
+          filePath: _activeFile.path,
+          operation: operation,
+        ),
+      );
+    }
+  }
+
+  void publishLocalCursor({
+    required int offset,
+    int? selectionStart,
+    int? selectionEnd,
+  }) {
+    collaborationService?.updateLocalCursor(
+      _activeFile.path,
+      offset,
+      selectionStart: selectionStart,
+      selectionEnd: selectionEnd,
+    );
+  }
+
+  void applyRemoteTextUpdate(CollaborationTextUpdate update) {
+    if (update.filePath == _activeFile.path) return;
+    WhiskFile applyTo(WhiskFile file) {
+      if (file.path != update.filePath) return file;
+      return file.copyWith(
+        content: _applyOperation(file.content, update.operation),
+        isDirty: true,
+      );
+    }
+
+    _projectFiles = _projectFiles.map(applyTo).toList(growable: false);
+    _openFiles = _openFiles.map(applyTo).toList(growable: false);
+    notifyListeners();
+  }
+
+  void updateActiveContentFromRemote(String content) {
+    if (_disposed) return;
+    if (content == _activeFile.content) return;
+    _activeFile = _activeFile.copyWith(content: content, isDirty: true);
+    _replaceFileInLists(_activeFile);
+    notifyListeners();
+  }
+
+  Future<void> _syncActiveFileSnapshot() async {
+    final service = collaborationService;
+    if (service == null) return;
+    final activePath = _activeFile.path;
+    final snapshot = await service.loadFileSnapshot(
+      activePath,
+      _activeFile.content,
+    );
+    if (_disposed || _activeFile.path != activePath) return;
+    if (snapshot == _activeFile.content) return;
+    _activeFile = _activeFile.copyWith(content: snapshot, isDirty: true);
+    _replaceFileInLists(_activeFile);
+    notifyListeners();
+  }
+
+  String _applyOperation(String text, EditorTextOperation operation) {
+    final start = operation.offset.clamp(0, text.length);
+    final end = (start + operation.deletedText.length).clamp(
+      start,
+      text.length,
+    );
+    return text.replaceRange(start, end, operation.insertedText);
   }
 
   WhiskFile _fileForEnvironment(EnvironmentKind environment) {
