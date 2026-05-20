@@ -10,10 +10,12 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.onOpenDraftWorkspace,
     required this.onOpenLatexProject,
+    required this.onOpenLocalCollaboration,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
+  final VoidCallback onOpenLocalCollaboration;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -78,12 +80,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         widget.onOpenDraftWorkspace,
                                     onOpenLatexProject:
                                         widget.onOpenLatexProject,
+                                    onOpenLocalCollaboration:
+                                        widget.onOpenLocalCollaboration,
                                   )
                                 : _WideDashboard(
                                     onOpenDraftWorkspace:
                                         widget.onOpenDraftWorkspace,
                                     onOpenLatexProject:
                                         widget.onOpenLatexProject,
+                                    onOpenLocalCollaboration:
+                                        widget.onOpenLocalCollaboration,
                                   ),
                           ],
                         ),
@@ -240,10 +246,12 @@ class _WideDashboard extends StatelessWidget {
   const _WideDashboard({
     required this.onOpenDraftWorkspace,
     required this.onOpenLatexProject,
+    required this.onOpenLocalCollaboration,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
+  final VoidCallback onOpenLocalCollaboration;
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +277,12 @@ class _WideDashboard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 18),
-        const SizedBox(width: 280, child: _CollaborationCard()),
+        SizedBox(
+          width: 280,
+          child: _CollaborationCard(
+            onOpenLocalCollaboration: onOpenLocalCollaboration,
+          ),
+        ),
       ],
     );
   }
@@ -279,10 +292,12 @@ class _CompactDashboard extends StatelessWidget {
   const _CompactDashboard({
     required this.onOpenDraftWorkspace,
     required this.onOpenLatexProject,
+    required this.onOpenLocalCollaboration,
   });
 
   final VoidCallback onOpenDraftWorkspace;
   final VoidCallback onOpenLatexProject;
+  final VoidCallback onOpenLocalCollaboration;
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +312,7 @@ class _CompactDashboard extends StatelessWidget {
         const SizedBox(height: 16),
         const _RecentFilesCard(),
         const SizedBox(height: 16),
-        const _CollaborationCard(),
+        _CollaborationCard(onOpenLocalCollaboration: onOpenLocalCollaboration),
       ],
     );
   }
@@ -699,7 +714,9 @@ class _RecentFileRowState extends State<_RecentFileRow> {
 }
 
 class _CollaborationCard extends StatelessWidget {
-  const _CollaborationCard();
+  const _CollaborationCard({required this.onOpenLocalCollaboration});
+
+  final VoidCallback onOpenLocalCollaboration;
 
   @override
   Widget build(BuildContext context) {
@@ -707,12 +724,16 @@ class _CollaborationCard extends StatelessWidget {
       title: 'Collaboration',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _PeerRow(name: 'Local instance', detail: 'current window'),
-          _PeerRow(name: 'Second perspective', detail: 'open another instance'),
-          SizedBox(height: 12),
+        children: [
+          const _PeerRow(name: 'Local instance', detail: 'current window'),
+          _PeerRow(
+            name: 'Second perspective',
+            detail: 'open local realtime test',
+            onTap: onOpenLocalCollaboration,
+          ),
+          const SizedBox(height: 12),
           Text(
-            'Future sessions should support multiple windows and even two local identities for testing presence.',
+            'Open a local two-perspective session to test realtime edits, remote cursors and selections before networking.',
             style: TextStyle(color: kTextSecondary, height: 1.35),
           ),
         ],
@@ -722,10 +743,11 @@ class _CollaborationCard extends StatelessWidget {
 }
 
 class _PeerRow extends StatefulWidget {
-  const _PeerRow({required this.name, required this.detail});
+  const _PeerRow({required this.name, required this.detail, this.onTap});
 
   final String name;
   final String detail;
+  final VoidCallback? onTap;
 
   @override
   State<_PeerRow> createState() => _PeerRowState();
@@ -739,51 +761,64 @@ class _PeerRowState extends State<_PeerRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: _isHovered
-              ? kGlassHighlight.withValues(alpha: 0.3)
-              : Colors.transparent,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
           borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: _isHovered
-                  ? kAccentBlue.withValues(alpha: 0.15)
-                  : kGlassHighlight,
-              child: Icon(
-                Icons.person_outline,
-                color: _isHovered ? kAccentBlue : kTextSecondary,
-                size: 18,
-              ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _isHovered
+                  ? kGlassHighlight.withValues(alpha: 0.3)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: _isHovered ? kTextPrimary : kTextSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: _isHovered
+                      ? kAccentBlue.withValues(alpha: 0.15)
+                      : kGlassHighlight,
+                  child: Icon(
+                    Icons.person_outline,
+                    color: _isHovered ? kAccentBlue : kTextSecondary,
+                    size: 18,
                   ),
-                  Text(
-                    widget.detail,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kTextMuted, fontSize: 12),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _isHovered ? kTextPrimary : kTextSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        widget.detail,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: kTextMuted, fontSize: 12),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                if (widget.onTap != null)
+                  const Icon(
+                    Icons.arrow_forward,
+                    color: kTextSecondary,
+                    size: 16,
+                  ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

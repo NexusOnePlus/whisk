@@ -34,10 +34,25 @@ class _AppShellState extends State<AppShell> {
           AppShellMode.dashboard => DashboardScreen(
             onOpenDraftWorkspace: viewModel.openDraftWorkspace,
             onOpenLatexProject: viewModel.openLatexProject,
+            onOpenLocalCollaboration: viewModel.openLocalCollaborationDemo,
           ),
           AppShellMode.workspace => WorkspaceScreen(
             viewModel: viewModel.workspaceViewModel!,
             onCloseWorkspace: viewModel.closeWorkspace,
+          ),
+          AppShellMode.localCollaboration => Row(
+            children: [
+              for (final workspace in viewModel.collaborationViewModels) ...[
+                Expanded(
+                  child: WorkspaceScreen(
+                    viewModel: workspace,
+                    onCloseWorkspace: viewModel.closeWorkspace,
+                  ),
+                ),
+                if (workspace != viewModel.collaborationViewModels.last)
+                  const VerticalDivider(width: 1),
+              ],
+            ],
           ),
         };
       },
