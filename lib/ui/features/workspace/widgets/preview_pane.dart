@@ -323,54 +323,55 @@ class _PreviewMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 140),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(environment.icon, color: kAccentBlue, size: 18),
-              const SizedBox(width: 8),
+              Row(
+                children: [
+                  Icon(environment.icon, color: kAccentBlue, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    environment.extension,
+                    style: const TextStyle(
+                      color: kTextMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
               Text(
-                environment.extension,
+                title,
                 style: const TextStyle(
-                  color: kTextMuted,
-                  fontSize: 12,
+                  color: kTextPrimary,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: const TextStyle(color: kTextSecondary, height: 1.35),
+              ),
+              const SizedBox(height: 16),
+              _PreviewStatusGrid(result: result),
+              const SizedBox(height: 16),
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: const LinearGradient(
+                    colors: [kAccentBlue, kSuccessGreen],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 22),
-          Text(
-            title,
-            style: const TextStyle(
-              color: kTextPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Text(
-                message,
-                style: const TextStyle(color: kTextSecondary, height: 1.35),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _PreviewStatusGrid(result: result),
-          const SizedBox(height: 20),
-          Container(
-            height: 8,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              gradient: const LinearGradient(
-                colors: [kAccentBlue, kSuccessGreen],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
