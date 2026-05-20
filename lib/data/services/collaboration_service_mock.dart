@@ -14,6 +14,9 @@ class CollaborationServiceMock implements CollaborationService {
   String get peerId => 'mock-local-peer';
 
   @override
+  bool get canWriteLocalFiles => true;
+
+  @override
   Stream<List<CollaborationPeer>> get peers => _peerController.stream;
 
   @override

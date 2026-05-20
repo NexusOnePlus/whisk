@@ -18,7 +18,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   WorkspaceViewModel({
     EnvironmentCatalog catalog = const EnvironmentCatalog(),
     this.collaborationService,
-    this._renderService = const DocumentRenderService(),
+    this.renderService = const DocumentRenderService(),
     this._watcherService = const FileWatcherService(),
     this._openService = const ProjectOpenService(),
     WhiskFile? initialFile,
@@ -32,7 +32,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   }
 
   final CollaborationService? collaborationService;
-  final DocumentRenderService _renderService;
+  final DocumentRenderService renderService;
   final FileWatcherService _watcherService;
   final ProjectOpenService _openService;
   StreamSubscription? _watcherSubscription;
@@ -118,10 +118,18 @@ class WorkspaceViewModel extends ChangeNotifier {
     notifyListeners();
 
     final activeFile = _activeFile;
+    final renderFile = _canWriteLocalFiles
+        ? activeFile
+        : WhiskFile(
+            path: activeFile.path,
+            name: activeFile.name,
+            extension: activeFile.extension,
+            content: activeFile.content,
+          );
     final environmentId = selectedEnvironment.id;
-    final result = await _renderService.render(
+    final result = await renderService.render(
       environmentId: selectedEnvironment.id,
-      file: activeFile,
+      file: renderFile,
     );
     if (_disposed || _activeFile.path != activeFile.path) return;
     if (selectedEnvironment.id != environmentId) return;
@@ -134,6 +142,12 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (_disposed) return;
     if (!_activeFile.isDirty) return;
     if (_activeFile.projectRoot == null) return;
+    if (!_canWriteLocalFiles) {
+      _activeFile = _activeFile.copyWith(isDirty: false);
+      _replaceFileInLists(_activeFile);
+      notifyListeners();
+      return;
+    }
 
     final file = File(_activeFile.path);
     await file.parent.create(recursive: true);
@@ -150,7 +164,10 @@ class WorkspaceViewModel extends ChangeNotifier {
 
   Future<bool> joinCollaborationInvite(String invite) async {
     if (_disposed) return false;
-    return collaborationService?.joinInvite(invite) ?? false;
+    final joined =
+        await (collaborationService?.joinInvite(invite) ?? Future.value(false));
+    if (joined) notifyListeners();
+    return joined;
   }
 
   @override
@@ -325,6 +342,9 @@ class WorkspaceViewModel extends ChangeNotifier {
     _replaceFileInLists(_activeFile);
     notifyListeners();
   }
+
+  bool get _canWriteLocalFiles =>
+      collaborationService?.canWriteLocalFiles ?? true;
 
   String _applyOperation(String text, EditorTextOperation operation) {
     final start = operation.offset.clamp(0, text.length);

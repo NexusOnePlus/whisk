@@ -3,6 +3,7 @@ import 'package:whisk/domain/models/collaboration_text_update.dart';
 
 abstract class CollaborationService {
   String get peerId;
+  bool get canWriteLocalFiles;
   Stream<List<CollaborationPeer>> get peers;
   Stream<CollaborationTextUpdate> get remoteTextUpdates;
 

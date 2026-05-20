@@ -70,6 +70,9 @@ class CollaborationServiceP2p
   var _connected = false;
 
   @override
+  bool get canWriteLocalFiles => _joinedInvite == null;
+
+  @override
   Stream<List<CollaborationPeer>> get peers => _peerController.stream;
 
   @override
