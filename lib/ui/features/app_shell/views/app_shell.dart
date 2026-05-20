@@ -40,22 +40,152 @@ class _AppShellState extends State<AppShell> {
             viewModel: viewModel.workspaceViewModel!,
             onCloseWorkspace: viewModel.closeWorkspace,
           ),
-          AppShellMode.localCollaboration => Row(
+          AppShellMode.localCollaboration => _LocalCollaborationWorkspace(
+            viewModel: viewModel,
+          ),
+        };
+      },
+    );
+  }
+}
+
+class _LocalCollaborationWorkspace extends StatelessWidget {
+  const _LocalCollaborationWorkspace({required this.viewModel});
+
+  final AppShellViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final workspaces = viewModel.collaborationViewModels;
+    return Column(
+      children: [
+        _LocalCollaborationToolbar(
+          peerCount: workspaces.length,
+          onAddPerspective: viewModel.addLocalCollaborationPerspective,
+          onCloseWorkspace: viewModel.closeWorkspace,
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: Row(
             children: [
-              for (final workspace in viewModel.collaborationViewModels) ...[
+              for (final workspace in workspaces) ...[
                 Expanded(
-                  child: WorkspaceScreen(
-                    viewModel: workspace,
-                    onCloseWorkspace: viewModel.closeWorkspace,
+                  child: Column(
+                    children: [
+                      _LocalPerspectiveHeader(
+                        title:
+                            'Perspective ${workspaces.indexOf(workspace) + 1}',
+                        canRemove: workspaces.length > 1,
+                        onRemove: () {
+                          viewModel.removeLocalCollaborationPerspective(
+                            workspace,
+                          );
+                        },
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: WorkspaceScreen(
+                          viewModel: workspace,
+                          onCloseWorkspace: viewModel.closeWorkspace,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (workspace != viewModel.collaborationViewModels.last)
+                if (workspace != workspaces.last)
                   const VerticalDivider(width: 1),
               ],
             ],
           ),
-        };
-      },
+        ),
+      ],
+    );
+  }
+}
+
+class _LocalCollaborationToolbar extends StatelessWidget {
+  const _LocalCollaborationToolbar({
+    required this.peerCount,
+    required this.onAddPerspective,
+    required this.onCloseWorkspace,
+  });
+
+  final int peerCount;
+  final VoidCallback onAddPerspective;
+  final VoidCallback onCloseWorkspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 44,
+      color: theme.colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Text('Local collaboration demo', style: theme.textTheme.labelLarge),
+          const SizedBox(width: 10),
+          Text(
+            '$peerCount perspectives',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton.icon(
+            onPressed: onAddPerspective,
+            icon: const Icon(Icons.add),
+            label: const Text('Add editor'),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Close demo',
+            onPressed: onCloseWorkspace,
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocalPerspectiveHeader extends StatelessWidget {
+  const _LocalPerspectiveHeader({
+    required this.title,
+    required this.canRemove,
+    required this.onRemove,
+  });
+
+  final String title;
+  final bool canRemove;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 32,
+      color: theme.colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.only(left: 10, right: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Remove perspective',
+            onPressed: canRemove ? onRemove : null,
+            iconSize: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
     );
   }
 }

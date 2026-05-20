@@ -161,6 +161,37 @@ void main() {
     expect(controller.undoEdit(), isFalse);
   });
 
+  test('emits inverse operations when undoing local edits', () async {
+    final controller = WhiskEditorController(text: '', environmentId: 'latex');
+    final emitted = <List<EditorTextOperation>>[];
+    final textAtEmit = <String>[];
+    final sub = controller.textOperations.listen(emitted.add);
+    final textSub = controller.textOperations.listen((_) {
+      textAtEmit.add(controller.text);
+    });
+
+    controller.value = controller.value.copyWith(
+      text: 'abc',
+      selection: const TextSelection.collapsed(offset: 3),
+      composing: TextRange.empty,
+    );
+    expect(controller.undoEdit(), isTrue);
+
+    await Future<void>.delayed(Duration.zero);
+    expect(emitted, hasLength(2));
+    expect(emitted.first.single.offset, 0);
+    expect(emitted.first.single.insertedText, 'abc');
+    expect(emitted.first.single.deletedText, isEmpty);
+    expect(emitted.last.single.offset, 0);
+    expect(emitted.last.single.deletedText, 'abc');
+    expect(emitted.last.single.insertedText, isEmpty);
+    expect(textAtEmit, ['abc', '']);
+
+    await textSub.cancel();
+    await sub.cancel();
+    controller.dispose();
+  });
+
   test('moves primary and active cursors with arrow keys model', () {
     final controller = WhiskEditorController(
       text: 'abc\ndef',

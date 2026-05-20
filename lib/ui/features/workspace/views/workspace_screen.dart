@@ -8,6 +8,7 @@ import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
 import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
+import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
 import 'package:whisk/ui/features/workspace/widgets/preview_pane.dart';
 import 'package:whisk/ui/features/workspace/widgets/sidebar.dart';
@@ -59,7 +60,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _findController = TextEditingController();
     _findFocusNode = FocusNode();
     _operationSubscription = _controller.textOperations.listen(
-      viewModel.publishLocalTextOperations,
+      _handleLocalTextOperations,
     );
     _remoteTextSubscription = viewModel.remoteTextUpdates?.listen(
       _handleRemoteTextUpdate,
@@ -100,7 +101,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     });
   }
 
+  void _handleLocalTextOperations(List<EditorTextOperation> operations) {
+    viewModel.publishLocalTextOperations(operations);
+    _contentSyncTimer?.cancel();
+    _pendingContent = null;
+    viewModel.updateActiveContent(_controller.text);
+  }
+
   void _handleRemoteTextUpdate(CollaborationTextUpdate update) {
+    _contentSyncTimer?.cancel();
+    _pendingContent = null;
     if (update.filePath == viewModel.activeFile.path) {
       _controller.applyRemoteOperation(update.operation);
       viewModel.updateActiveContentFromRemote(_controller.text);

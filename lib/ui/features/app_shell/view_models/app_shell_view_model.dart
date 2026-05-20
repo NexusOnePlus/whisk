@@ -8,10 +8,20 @@ enum AppShellMode { dashboard, workspace, localCollaboration }
 class AppShellViewModel extends ChangeNotifier {
   AppShellViewModel({this._projectOpenService = const ProjectOpenService()});
 
+  static const _localPeerColors = [
+    Colors.cyanAccent,
+    Colors.orangeAccent,
+    Colors.limeAccent,
+    Colors.pinkAccent,
+    Colors.lightBlueAccent,
+    Colors.amberAccent,
+  ];
+
   final ProjectOpenService _projectOpenService;
   AppShellMode _mode = AppShellMode.dashboard;
   WorkspaceViewModel? _workspaceViewModel;
   List<WorkspaceViewModel> _collaborationViewModels = const [];
+  var _localPeerSequence = 0;
   var _disposed = false;
 
   AppShellMode get mode => _mode;
@@ -39,24 +49,41 @@ class AppShellViewModel extends ChangeNotifier {
       workspace.dispose();
     }
 
+    _localPeerSequence = 0;
     _collaborationViewModels = [
-      WorkspaceViewModel(
-        collaborationService: CollaborationServiceP2p(
-          peerId: 'local-left',
-          peerName: 'Local instance',
-          peerColor: Colors.cyanAccent,
-        ),
-      ),
-      WorkspaceViewModel(
-        collaborationService: CollaborationServiceP2p(
-          peerId: 'local-right',
-          peerName: 'Second perspective',
-          peerColor: Colors.orangeAccent,
-        ),
-      ),
+      _createLocalCollaborationWorkspace(),
+      _createLocalCollaborationWorkspace(),
     ];
     _workspaceViewModel = null;
     _mode = AppShellMode.localCollaboration;
+    notifyListeners();
+  }
+
+  void addLocalCollaborationPerspective() {
+    if (_disposed) return;
+    if (_mode != AppShellMode.localCollaboration) return;
+
+    _collaborationViewModels = [
+      ..._collaborationViewModels,
+      _createLocalCollaborationWorkspace(),
+    ];
+    notifyListeners();
+  }
+
+  void removeLocalCollaborationPerspective(WorkspaceViewModel workspace) {
+    if (_disposed) return;
+    if (_mode != AppShellMode.localCollaboration) return;
+    if (!_collaborationViewModels.contains(workspace)) return;
+
+    workspace.dispose();
+    _collaborationViewModels = [
+      for (final item in _collaborationViewModels)
+        if (!identical(item, workspace)) item,
+    ];
+
+    if (_collaborationViewModels.isEmpty) {
+      _mode = AppShellMode.dashboard;
+    }
     notifyListeners();
   }
 
@@ -94,6 +121,18 @@ class AppShellViewModel extends ChangeNotifier {
     _collaborationViewModels = const [];
     _mode = AppShellMode.dashboard;
     notifyListeners();
+  }
+
+  WorkspaceViewModel _createLocalCollaborationWorkspace() {
+    final sequence = _localPeerSequence++;
+    final number = sequence + 1;
+    return WorkspaceViewModel(
+      collaborationService: CollaborationServiceP2p(
+        peerId: 'local-peer-$number',
+        peerName: 'Perspective $number',
+        peerColor: _localPeerColors[sequence % _localPeerColors.length],
+      ),
+    );
   }
 
   @override

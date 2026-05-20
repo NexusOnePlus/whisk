@@ -22,7 +22,7 @@ class WhiskEditorController extends TextEditingController {
   List<EditorSelectionRange> secondarySelections = const [];
   List<EditorSelectionRange> activeCursors = const [];
   final _textOperationsController =
-      StreamController<List<EditorTextOperation>>.broadcast();
+      StreamController<List<EditorTextOperation>>.broadcast(sync: true);
 
   final List<EditorTextTransaction> _undoStack = [];
   final List<EditorTextTransaction> _redoStack = [];
@@ -50,6 +50,7 @@ class WhiskEditorController extends TextEditingController {
         newValue.composing.isValid && !newValue.composing.isCollapsed;
 
     EditorTextOperation? operation;
+    List<EditorTextOperation>? operationsToEmit;
 
     if (!_applyingHistory && !_syncingFromModel && !_applyingCursors) {
       if (isComposing) {
@@ -96,7 +97,7 @@ class WhiskEditorController extends TextEditingController {
             ),
           );
           _redoStack.clear();
-          _emitOperations([operation]);
+          operationsToEmit = [operation];
         }
       }
     }
@@ -113,6 +114,9 @@ class WhiskEditorController extends TextEditingController {
     }
 
     super.value = newValue;
+    if (operationsToEmit != null) {
+      _emitOperations(operationsToEmit);
+    }
   }
 
   void setEnvironment(String id) {
@@ -386,34 +390,41 @@ class WhiskEditorController extends TextEditingController {
   bool undoEdit() {
     if (_undoStack.isEmpty) return false;
     final transaction = _undoStack.removeLast();
-    _applyOperations(transaction.inverseOperations());
+    final operations = transaction.inverseOperations();
+    _applyOperations(operations, emit: false);
     _redoStack.add(transaction);
     _setValueFromBuffer(
       selectionOffset: transaction.selectionOffsetBefore,
       cursorRanges: transaction.cursorRangesBefore,
     );
+    _emitOperations(operations);
     return true;
   }
 
   bool redoEdit() {
     if (_redoStack.isEmpty) return false;
     final transaction = _redoStack.removeLast();
-    _applyOperations(transaction.operations);
+    final operations = transaction.operations;
+    _applyOperations(operations, emit: false);
     _undoStack.add(transaction);
     _setValueFromBuffer(
       selectionOffset: transaction.selectionOffsetAfter,
       cursorRanges: transaction.cursorRangesAfter,
     );
+    _emitOperations(operations);
     return true;
   }
 
-  void _applyOperations(List<EditorTextOperation> operations) {
+  void _applyOperations(
+    List<EditorTextOperation> operations, {
+    bool emit = true,
+  }) {
     final ordered = [...operations]
       ..sort((a, b) => b.offset.compareTo(a.offset));
     for (final operation in ordered) {
       buffer.apply(operation);
     }
-    _emitOperations(ordered);
+    if (emit) _emitOperations(ordered);
   }
 
   void _setValueFromBuffer({
