@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/app_window_service.dart';
+import 'package:whisk/src/rust/frb_generated.dart';
 import 'package:whisk/ui/core/app_frame.dart';
 import 'package:whisk/ui/core/whisk_theme.dart';
 import 'package:whisk/ui/features/app_shell/views/app_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await RustLib.init();
   await const AppWindowService().initialize();
   runApp(const WhiskApp());
 }
