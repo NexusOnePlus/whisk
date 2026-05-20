@@ -62,10 +62,13 @@ class CollaborationServiceP2p
   final _remoteInvites = <String, String>{};
   final _irohPresence = <String, CollaborationPeer>{};
   final _remoteStateVectors = <String, Map<String, List<int>>>{};
+  final _irohLastSeen = <String, DateTime>{};
   final _pendingSnapshotRequests = <String, Completer<String?>>{};
+  CollaborationPeer? _localPresence;
   List<CollaborationPeer> _localTransportPeers = const [];
   List<CollaborationPeer> _irohPeers = const [];
   Timer? _irohInboxTimer;
+  DateTime? _lastPresenceHeartbeat;
   bool _isConnecting = false;
   var _connected = false;
 
@@ -110,6 +113,9 @@ class CollaborationServiceP2p
     _remoteInvites.clear();
     _irohPresence.clear();
     _remoteStateVectors.clear();
+    _irohLastSeen.clear();
+    _localPresence = null;
+    _lastPresenceHeartbeat = null;
     for (final completer in _pendingSnapshotRequests.values) {
       if (!completer.isCompleted) completer.complete(null);
     }
@@ -189,6 +195,7 @@ class CollaborationServiceP2p
       selectionStart: selectionStart,
       selectionEnd: selectionEnd,
     );
+    _localPresence = peer;
     _transport.updatePresence(peer);
     _broadcastPresence(peer);
   }
@@ -295,6 +302,8 @@ class CollaborationServiceP2p
     _irohInboxTimer?.cancel();
     _irohInboxTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
       _drainIrohInbox();
+      _sendPresenceHeartbeat();
+      _removeStaleIrohPeers();
     });
   }
 
@@ -327,6 +336,7 @@ class CollaborationServiceP2p
       }
       if (envelope.type != 'crdt_update') continue;
       if (envelope.filePath == null || envelope.update == null) continue;
+      _markIrohPeerSeen(envelope.peerId);
 
       final oldText = engine.getText(filePath: envelope.filePath!);
       if (!engine.applyRemoteUpdate(
@@ -419,6 +429,7 @@ class CollaborationServiceP2p
     if (remotePeerId == peerId) return;
     final isNewPeer = !_remoteInvites.containsKey(remotePeerId);
     _remoteInvites[remotePeerId] = invite;
+    _markIrohPeerSeen(remotePeerId);
     final inviteStateVectors = _remoteStateVectors.remove(invite);
     if (inviteStateVectors != null) {
       _remoteStateVectors[remotePeerId] = inviteStateVectors;
@@ -441,11 +452,16 @@ class CollaborationServiceP2p
         unawaited(_sendHelloToInvite(engine: engine, invite: invite));
       }
     }
+    final localPresence = _localPresence;
+    if (localPresence != null) {
+      _broadcastPresence(localPresence);
+    }
   }
 
   void _handleIrohPresence(_IrohEnvelope envelope) {
     final peer = envelope.peer;
     if (peer == null || peer.id == peerId) return;
+    _markIrohPeerSeen(peer.id);
     _irohPresence[peer.id] = peer;
     _rebuildIrohPeers();
     _publishCombinedPeers();
@@ -467,6 +483,7 @@ class CollaborationServiceP2p
     _remoteInvites.remove(remotePeerId);
     _irohPresence.remove(remotePeerId);
     _remoteStateVectors.remove(remotePeerId);
+    _irohLastSeen.remove(remotePeerId);
     _rebuildIrohPeers();
     _publishCombinedPeers();
   }
@@ -559,6 +576,39 @@ class CollaborationServiceP2p
     for (final invite in _activeRemoteInvites()) {
       unawaited(engine.sendBytesToInvite(invite: invite, payload: payload));
     }
+  }
+
+  void _sendPresenceHeartbeat() {
+    final localPresence = _localPresence;
+    if (localPresence == null) return;
+    final now = DateTime.now();
+    final previous = _lastPresenceHeartbeat;
+    if (previous != null && now.difference(previous).inSeconds < 5) return;
+    _lastPresenceHeartbeat = now;
+    _broadcastPresence(localPresence);
+  }
+
+  void _markIrohPeerSeen(String? remotePeerId) {
+    if (remotePeerId == null || remotePeerId == peerId) return;
+    _irohLastSeen[remotePeerId] = DateTime.now();
+  }
+
+  void _removeStaleIrohPeers() {
+    if (_irohLastSeen.isEmpty) return;
+    final now = DateTime.now();
+    final stalePeerIds = [
+      for (final entry in _irohLastSeen.entries)
+        if (now.difference(entry.value).inSeconds > 30) entry.key,
+    ];
+    if (stalePeerIds.isEmpty) return;
+    for (final peerId in stalePeerIds) {
+      _remoteInvites.remove(peerId);
+      _irohPresence.remove(peerId);
+      _remoteStateVectors.remove(peerId);
+      _irohLastSeen.remove(peerId);
+    }
+    _rebuildIrohPeers();
+    _publishCombinedPeers();
   }
 
   CollaborationPeer? _decodePeer(Map<String, Object?> value) {
