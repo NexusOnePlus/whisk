@@ -62,6 +62,7 @@ class CollaborationServiceP2p
   final _remoteInvites = <String, String>{};
   final _irohPresence = <String, CollaborationPeer>{};
   final _remoteStateVectors = <String, Map<String, List<int>>>{};
+  final _pendingSnapshotRequests = <String, Completer<String?>>{};
   List<CollaborationPeer> _localTransportPeers = const [];
   List<CollaborationPeer> _irohPeers = const [];
   Timer? _irohInboxTimer;
@@ -105,6 +106,10 @@ class CollaborationServiceP2p
     _remoteInvites.clear();
     _irohPresence.clear();
     _remoteStateVectors.clear();
+    for (final completer in _pendingSnapshotRequests.values) {
+      if (!completer.isCompleted) completer.complete(null);
+    }
+    _pendingSnapshotRequests.clear();
     _localTransportPeers = const [];
     _irohPeers = const [];
     _connected = false;
@@ -115,7 +120,15 @@ class CollaborationServiceP2p
   Future<String> loadFileSnapshot(String filePath, String localContent) async {
     final engine = _engine;
     final snapshot = await _transport.loadFileSnapshot(filePath, localContent);
-    engine?.loadFileSnapshot(filePath: filePath, text: snapshot);
+    if (engine == null) return snapshot;
+
+    if (_joinedInvite != null) {
+      engine.loadFileSnapshot(filePath: filePath, text: '');
+      final remoteSnapshot = await _requestIrohSnapshot(filePath);
+      if (remoteSnapshot != null) return remoteSnapshot;
+    }
+
+    engine.loadFileSnapshot(filePath: filePath, text: snapshot);
     return snapshot;
   }
 
@@ -296,6 +309,14 @@ class CollaborationServiceP2p
         _handleIrohPresence(envelope);
         continue;
       }
+      if (envelope.type == 'snapshot_request') {
+        _handleSnapshotRequest(envelope);
+        continue;
+      }
+      if (envelope.type == 'snapshot_response') {
+        _handleSnapshotResponse(engine, envelope);
+        continue;
+      }
       if (envelope.type != 'crdt_update') continue;
       if (envelope.filePath == null || envelope.update == null) continue;
 
@@ -420,6 +441,87 @@ class CollaborationServiceP2p
     _irohPresence[peer.id] = peer;
     _rebuildIrohPeers();
     _publishCombinedPeers();
+  }
+
+  Future<String?> _requestIrohSnapshot(String filePath) async {
+    final engine = _engine;
+    final joinedInvite = _joinedInvite;
+    if (engine == null || joinedInvite == null) return null;
+
+    final existing = _pendingSnapshotRequests[filePath];
+    if (existing != null) return existing.future;
+
+    final completer = Completer<String?>();
+    _pendingSnapshotRequests[filePath] = completer;
+    final sent = await engine.sendBytesToInvite(
+      invite: joinedInvite,
+      payload: _encodeIrohEnvelope(
+        type: 'snapshot_request',
+        peerId: peerId,
+        filePath: filePath,
+      ),
+    );
+    if (!sent && !completer.isCompleted) {
+      completer.complete(null);
+    }
+
+    try {
+      return await completer.future.timeout(const Duration(seconds: 2));
+    } on TimeoutException {
+      return null;
+    } finally {
+      _pendingSnapshotRequests.remove(filePath);
+    }
+  }
+
+  void _handleSnapshotRequest(_IrohEnvelope envelope) {
+    final engine = _engine;
+    final remotePeerId = envelope.peerId;
+    final filePath = envelope.filePath;
+    if (engine == null || remotePeerId == null || filePath == null) return;
+    final invite = _remoteInvites[remotePeerId];
+    if (invite == null) return;
+
+    unawaited(
+      engine.sendBytesToInvite(
+        invite: invite,
+        payload: _encodeIrohEnvelope(
+          type: 'snapshot_response',
+          peerId: peerId,
+          filePath: filePath,
+          update: engine.encodeFullUpdate(filePath: filePath),
+          stateVector: engine.encodeStateVector(filePath: filePath),
+        ),
+      ),
+    );
+  }
+
+  void _handleSnapshotResponse(
+    CollaborationEngine engine,
+    _IrohEnvelope envelope,
+  ) {
+    final filePath = envelope.filePath;
+    final update = envelope.update;
+    if (filePath == null || update == null) return;
+    final completer = _pendingSnapshotRequests[filePath];
+    if (completer == null) return;
+    if (!engine.applyRemoteUpdate(filePath: filePath, update: update)) {
+      if (!completer.isCompleted) {
+        completer.complete(null);
+      }
+      return;
+    }
+    if (envelope.peerId != null && envelope.stateVector != null) {
+      _setStateVectorFor(
+        peerId: envelope.peerId!,
+        filePath: filePath,
+        stateVector: envelope.stateVector!,
+      );
+    }
+    final snapshot = engine.getText(filePath: filePath);
+    if (!completer.isCompleted) {
+      completer.complete(snapshot);
+    }
   }
 
   void _broadcastPresence(CollaborationPeer peer) {
