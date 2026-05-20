@@ -17,6 +17,17 @@ abstract class CollaborationEngine implements RustOpaqueInterface {
     required RustTextOperation op,
   });
 
+  bool applyRemoteUpdate({required String filePath, required List<int> update});
+
+  Uint8List encodeFullUpdate({required String filePath});
+
+  Uint8List encodeStateVector({required String filePath});
+
+  Uint8List encodeUpdateSince({
+    required String filePath,
+    required List<int> stateVector,
+  });
+
   String getText({required String filePath});
 
   void loadFileSnapshot({required String filePath, required String text});

@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1571644169;
+  int get rustContentHash => 1920715800;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -83,6 +83,28 @@ abstract class RustLibApi extends BaseApi {
     required CollaborationEngine that,
     required String filePath,
     required RustTextOperation op,
+  });
+
+  bool crateApiCollaborationCollaborationEngineApplyRemoteUpdate({
+    required CollaborationEngine that,
+    required String filePath,
+    required List<int> update,
+  });
+
+  Uint8List crateApiCollaborationCollaborationEngineEncodeFullUpdate({
+    required CollaborationEngine that,
+    required String filePath,
+  });
+
+  Uint8List crateApiCollaborationCollaborationEngineEncodeStateVector({
+    required CollaborationEngine that,
+    required String filePath,
+  });
+
+  Uint8List crateApiCollaborationCollaborationEngineEncodeUpdateSince({
+    required CollaborationEngine that,
+    required String filePath,
+    required List<int> stateVector,
   });
 
   String crateApiCollaborationCollaborationEngineGetText({
@@ -162,6 +184,150 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  bool crateApiCollaborationCollaborationEngineApplyRemoteUpdate({
+    required CollaborationEngine that,
+    required String filePath,
+    required List<int> update,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(filePath, serializer);
+          sse_encode_list_prim_u_8_loose(update, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineApplyRemoteUpdateConstMeta,
+        argValues: [that, filePath, update],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineApplyRemoteUpdateConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_apply_remote_update",
+        argNames: ["that", "filePath", "update"],
+      );
+
+  @override
+  Uint8List crateApiCollaborationCollaborationEngineEncodeFullUpdate({
+    required CollaborationEngine that,
+    required String filePath,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(filePath, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineEncodeFullUpdateConstMeta,
+        argValues: [that, filePath],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineEncodeFullUpdateConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_encode_full_update",
+        argNames: ["that", "filePath"],
+      );
+
+  @override
+  Uint8List crateApiCollaborationCollaborationEngineEncodeStateVector({
+    required CollaborationEngine that,
+    required String filePath,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(filePath, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineEncodeStateVectorConstMeta,
+        argValues: [that, filePath],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineEncodeStateVectorConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_encode_state_vector",
+        argNames: ["that", "filePath"],
+      );
+
+  @override
+  Uint8List crateApiCollaborationCollaborationEngineEncodeUpdateSince({
+    required CollaborationEngine that,
+    required String filePath,
+    required List<int> stateVector,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(filePath, serializer);
+          sse_encode_list_prim_u_8_loose(stateVector, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineEncodeUpdateSinceConstMeta,
+        argValues: [that, filePath, stateVector],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineEncodeUpdateSinceConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_encode_update_since",
+        argNames: ["that", "filePath", "stateVector"],
+      );
+
+  @override
   String crateApiCollaborationCollaborationEngineGetText({
     required CollaborationEngine that,
     required String filePath,
@@ -175,7 +341,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(filePath, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -210,7 +376,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(filePath, serializer);
           sse_encode_String(text, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -237,7 +403,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -269,7 +435,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 9,
             port: port_,
           );
         },
@@ -299,7 +465,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -324,7 +490,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 11,
             port: port_,
           );
         },
@@ -384,9 +550,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
+  }
+
+  @protected
   RustTextOperation dco_decode_box_autoadd_rust_text_operation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_rust_text_operation(raw);
+  }
+
+  @protected
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as List<int>;
   }
 
   @protected
@@ -476,11 +654,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
   RustTextOperation sse_decode_box_autoadd_rust_text_operation(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_rust_text_operation(deserializer));
+  }
+
+  @protected
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getUint8List(len_);
   }
 
   @protected
@@ -535,12 +726,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
-  }
-
-  @protected
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
     CollaborationEngine self,
@@ -586,12 +771,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
   void sse_encode_box_autoadd_rust_text_operation(
     RustTextOperation self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_rust_text_operation(self, serializer);
+  }
+
+  @protected
+  void sse_encode_list_prim_u_8_loose(
+    List<int> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putUint8List(
+      self is Uint8List ? self : Uint8List.fromList(self),
+    );
   }
 
   @protected
@@ -643,12 +846,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
   }
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
-  }
 }
 
 @sealed
@@ -687,6 +884,40 @@ class CollaborationEngineImpl extends RustOpaque
         that: this,
         filePath: filePath,
         op: op,
+      );
+
+  bool applyRemoteUpdate({
+    required String filePath,
+    required List<int> update,
+  }) => RustLib.instance.api
+      .crateApiCollaborationCollaborationEngineApplyRemoteUpdate(
+        that: this,
+        filePath: filePath,
+        update: update,
+      );
+
+  Uint8List encodeFullUpdate({required String filePath}) => RustLib.instance.api
+      .crateApiCollaborationCollaborationEngineEncodeFullUpdate(
+        that: this,
+        filePath: filePath,
+      );
+
+  Uint8List encodeStateVector({required String filePath}) => RustLib
+      .instance
+      .api
+      .crateApiCollaborationCollaborationEngineEncodeStateVector(
+        that: this,
+        filePath: filePath,
+      );
+
+  Uint8List encodeUpdateSince({
+    required String filePath,
+    required List<int> stateVector,
+  }) => RustLib.instance.api
+      .crateApiCollaborationCollaborationEngineEncodeUpdateSince(
+        that: this,
+        filePath: filePath,
+        stateVector: stateVector,
       );
 
   String getText({required String filePath}) =>
