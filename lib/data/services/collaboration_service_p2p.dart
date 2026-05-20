@@ -3,26 +3,35 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/collaboration_service.dart';
+import 'package:whisk/data/services/collaboration_transport.dart';
+import 'package:whisk/data/services/local_collaboration_transport.dart';
 import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/src/rust/api/collaboration.dart';
-import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 
-class CollaborationServiceP2p implements CollaborationService {
-  CollaborationServiceP2p({String? peerId, String? peerName, Color? peerColor})
-    : peerId = peerId ?? _createPeerId(),
-      peerName = peerName ?? 'Local ${_nextPeerNumber()}',
-      peerColor = peerColor ?? _palette[_random.nextInt(_palette.length)],
-      _useRustEngine = true;
+class CollaborationServiceP2p
+    implements CollaborationService, CollaborationTransportClient {
+  CollaborationServiceP2p({
+    String? peerId,
+    String? peerName,
+    Color? peerColor,
+    CollaborationTransport? transport,
+  }) : peerId = peerId ?? _createPeerId(),
+       peerName = peerName ?? 'Local ${_nextPeerNumber()}',
+       peerColor = peerColor ?? _palette[_random.nextInt(_palette.length)],
+       _transport = transport ?? LocalCollaborationTransport(),
+       _useRustEngine = true;
 
   @visibleForTesting
   CollaborationServiceP2p.localOnly({
     String? peerId,
     String? peerName,
     Color? peerColor,
+    CollaborationTransport? transport,
   }) : peerId = peerId ?? _createPeerId(),
        peerName = peerName ?? 'Local ${_nextPeerNumber()}',
        peerColor = peerColor ?? _palette[_random.nextInt(_palette.length)],
+       _transport = transport ?? LocalCollaborationTransport(),
        _useRustEngine = false;
 
   static final _random = Random();
@@ -42,9 +51,9 @@ class CollaborationServiceP2p implements CollaborationService {
   final String peerId;
   final String peerName;
   final Color peerColor;
+  final CollaborationTransport _transport;
   final bool _useRustEngine;
   CollaborationEngine? _engine;
-  _LocalCollaborationRoom? _room;
   bool _isConnecting = false;
   var _connected = false;
 
@@ -64,9 +73,8 @@ class CollaborationServiceP2p implements CollaborationService {
         _engine = CollaborationEngine();
         await _engine!.startSession();
       }
-      _room = _LocalCollaborationHub.join(workspaceId, this);
+      await _transport.connect(workspaceId: workspaceId, client: this);
       _connected = true;
-      _room!.publishPeers();
     } finally {
       _isConnecting = false;
     }
@@ -74,8 +82,7 @@ class CollaborationServiceP2p implements CollaborationService {
 
   @override
   Future<void> disconnect() async {
-    _room?.leave(peerId);
-    _room = null;
+    await _transport.disconnect();
     _engine?.dispose();
     _engine = null;
     _connected = false;
@@ -85,10 +92,7 @@ class CollaborationServiceP2p implements CollaborationService {
   @override
   Future<String> loadFileSnapshot(String filePath, String localContent) async {
     final engine = _engine;
-    final room = _room;
-    if (room == null) return localContent;
-
-    final snapshot = room.loadSnapshot(filePath, localContent);
+    final snapshot = await _transport.loadFileSnapshot(filePath, localContent);
     engine?.loadFileSnapshot(filePath: filePath, text: snapshot);
     return snapshot;
   }
@@ -100,7 +104,7 @@ class CollaborationServiceP2p implements CollaborationService {
     int? selectionStart,
     int? selectionEnd,
   }) {
-    _room?.updatePresence(
+    _transport.updatePresence(
       CollaborationPeer(
         id: peerId,
         name: peerName,
@@ -124,10 +128,11 @@ class CollaborationServiceP2p implements CollaborationService {
         insertedText: update.operation.insertedText,
       ),
     );
-    _room?.broadcastTextUpdate(update);
+    _transport.broadcastTextUpdate(update);
   }
 
-  void _receiveTextUpdate(CollaborationTextUpdate update) {
+  @override
+  void receiveTextUpdate(CollaborationTextUpdate update) {
     if (update.peerId == peerId) return;
     _engine?.applyLocalEdit(
       filePath: update.filePath,
@@ -140,7 +145,8 @@ class CollaborationServiceP2p implements CollaborationService {
     _textController.add(update);
   }
 
-  void _publishPeers(List<CollaborationPeer> peers) {
+  @override
+  void publishPeers(List<CollaborationPeer> peers) {
     _peerController.add([
       for (final peer in peers)
         if (peer.id != peerId) peer,
@@ -156,76 +162,5 @@ class CollaborationServiceP2p implements CollaborationService {
   static int _nextPeerNumber() {
     _peerCounter += 1;
     return _peerCounter;
-  }
-}
-
-class _LocalCollaborationHub {
-  static final _rooms = <String, _LocalCollaborationRoom>{};
-
-  static _LocalCollaborationRoom join(
-    String workspaceId,
-    CollaborationServiceP2p service,
-  ) {
-    final room = _rooms.putIfAbsent(
-      workspaceId,
-      () => _LocalCollaborationRoom(workspaceId),
-    );
-    room.join(service);
-    return room;
-  }
-}
-
-class _LocalCollaborationRoom {
-  _LocalCollaborationRoom(this.workspaceId);
-
-  final String workspaceId;
-  final _members = <String, CollaborationServiceP2p>{};
-  final _presence = <String, CollaborationPeer>{};
-  final _snapshots = <String, String>{};
-
-  void join(CollaborationServiceP2p service) {
-    _members[service.peerId] = service;
-  }
-
-  void leave(String peerId) {
-    _members.remove(peerId);
-    _presence.remove(peerId);
-    publishPeers();
-  }
-
-  String loadSnapshot(String filePath, String localContent) {
-    return _snapshots.putIfAbsent(filePath, () => localContent);
-  }
-
-  void updatePresence(CollaborationPeer peer) {
-    _presence[peer.id] = peer;
-    publishPeers();
-  }
-
-  void publishPeers() {
-    final peers = _presence.values.toList(growable: false);
-    for (final member in _members.values) {
-      member._publishPeers(peers);
-    }
-  }
-
-  void broadcastTextUpdate(CollaborationTextUpdate update) {
-    _snapshots[update.filePath] = _applyOperation(
-      _snapshots[update.filePath] ?? '',
-      update.operation,
-    );
-    for (final member in _members.values) {
-      if (member.peerId == update.peerId) continue;
-      member._receiveTextUpdate(update);
-    }
-  }
-
-  String _applyOperation(String text, EditorTextOperation operation) {
-    final start = operation.offset.clamp(0, text.length);
-    final end = (start + operation.deletedText.length).clamp(
-      start,
-      text.length,
-    );
-    return text.replaceRange(start, end, operation.insertedText);
   }
 }
