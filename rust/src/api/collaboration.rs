@@ -1,9 +1,13 @@
 use flutter_rust_bridge::frb;
+use iroh::{endpoint::presets, Endpoint, EndpointAddr};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use yrs::updates::decoder::Decode;
 use yrs::updates::encoder::Encode;
 use yrs::{Doc, GetString, ReadTxn, StateVector, Text, TextRef, Transact, Update};
+
+const WHISK_COLLAB_ALPN: &[u8] = b"whisk/collab/0";
+const MAX_MESSAGE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Debug)]
 pub struct RustTextOperation {
@@ -15,7 +19,8 @@ pub struct RustTextOperation {
 #[frb(opaque)]
 pub struct CollaborationEngine {
     files: Arc<Mutex<HashMap<String, CollaborationFile>>>,
-    // Add Iroh endpoint here later.
+    endpoint: Arc<Mutex<Option<Endpoint>>>,
+    inbox: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 struct CollaborationFile {
@@ -28,6 +33,8 @@ impl CollaborationEngine {
     pub fn new() -> Self {
         Self {
             files: Arc::new(Mutex::new(HashMap::new())),
+            endpoint: Arc::new(Mutex::new(None)),
+            inbox: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -133,10 +140,116 @@ impl CollaborationEngine {
         file.text.get_string(&txn)
     }
 
-    // Example Iroh method
-    pub async fn start_session(&self) {
-        // Initialize Iroh endpoint
+    pub async fn start_session(&self) -> String {
+        let endpoint = match Endpoint::builder(presets::N0)
+            .alpns(vec![WHISK_COLLAB_ALPN.to_vec()])
+            .bind()
+            .await
+        {
+            Ok(endpoint) => endpoint,
+            Err(_) => return String::new(),
+        };
+        endpoint.online().await;
+        let invite = match serde_json::to_string(&endpoint.addr()) {
+            Ok(invite) => invite,
+            Err(_) => return String::new(),
+        };
+
+        self.spawn_accept_loop(endpoint.clone());
+        let mut current = self
+            .endpoint
+            .lock()
+            .expect("collaboration endpoint lock poisoned");
+        *current = Some(endpoint);
+        invite
     }
+
+    pub async fn close_session(&self) {
+        let endpoint = {
+            let mut current = self
+                .endpoint
+                .lock()
+                .expect("collaboration endpoint lock poisoned");
+            current.take()
+        };
+        if let Some(endpoint) = endpoint {
+            endpoint.close().await;
+        }
+    }
+
+    pub async fn send_bytes_to_invite(&self, invite: String, payload: Vec<u8>) -> bool {
+        let Ok(addr) = serde_json::from_str::<EndpointAddr>(&invite) else {
+            return false;
+        };
+        let endpoint = match Endpoint::bind(presets::N0).await {
+            Ok(endpoint) => endpoint,
+            Err(_) => return false,
+        };
+        let result = send_bytes(&endpoint, addr, payload).await;
+        endpoint.close().await;
+        result
+    }
+
+    #[frb(sync)]
+    pub fn drain_received_bytes(&self) -> Vec<Vec<u8>> {
+        let mut inbox = self
+            .inbox
+            .lock()
+            .expect("collaboration inbox lock poisoned");
+        inbox.drain(..).collect()
+    }
+
+    fn spawn_accept_loop(&self, endpoint: Endpoint) {
+        let inbox = self.inbox.clone();
+        tokio::spawn(async move {
+            while let Some(incoming) = endpoint.accept().await {
+                let inbox = inbox.clone();
+                tokio::spawn(async move {
+                    let Ok(connection) = incoming.await else {
+                        return;
+                    };
+                    let Ok((mut send, mut recv)) = connection.accept_bi().await else {
+                        return;
+                    };
+                    let Ok(payload) = recv.read_to_end(MAX_MESSAGE_BYTES).await else {
+                        return;
+                    };
+                    {
+                        let mut inbox = inbox.lock().expect("collaboration inbox lock poisoned");
+                        inbox.push(payload);
+                    }
+                    let _ = send.write_all(b"ok").await;
+                    let _ = send.finish();
+                    connection.closed().await;
+                });
+            }
+        });
+    }
+}
+
+async fn send_bytes(endpoint: &Endpoint, addr: EndpointAddr, payload: Vec<u8>) -> bool {
+    let Ok(connection) = endpoint.connect(addr, WHISK_COLLAB_ALPN).await else {
+        return false;
+    };
+    let Ok((mut send, mut recv)) = connection.open_bi().await else {
+        connection.close(0u32.into(), b"stream failed");
+        return false;
+    };
+    if send.write_all(&payload).await.is_err() {
+        connection.close(0u32.into(), b"write failed");
+        return false;
+    }
+    if send.finish().is_err() {
+        connection.close(0u32.into(), b"finish failed");
+        return false;
+    }
+    let acknowledged = recv
+        .read_to_end(16)
+        .await
+        .map(|bytes| bytes == b"ok")
+        .unwrap_or(false);
+    connection.close(0u32.into(), b"done");
+    acknowledged
 }
 
 impl CollaborationFile {
@@ -174,5 +287,23 @@ mod tests {
         let delta = right.encode_update_since(file_path.clone(), left_state);
         assert!(left.apply_remote_update(file_path.clone(), delta));
         assert_eq!(left.get_text(file_path), "aXbc");
+    }
+
+    #[tokio::test]
+    async fn sends_binary_payloads_over_iroh_invites() {
+        let host = CollaborationEngine::new();
+        let guest = CollaborationEngine::new();
+        let invite = host.start_session().await;
+        assert!(!invite.is_empty());
+
+        assert!(
+            guest
+                .send_bytes_to_invite(invite, b"crdt-update".to_vec())
+                .await
+        );
+
+        let received = host.drain_received_bytes();
+        assert_eq!(received, vec![b"crdt-update".to_vec()]);
+        host.close_session().await;
     }
 }

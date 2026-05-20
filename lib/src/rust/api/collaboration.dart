@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `new`
+// These functions are ignored because they are not marked as `pub`: `new`, `send_bytes`, `spawn_accept_loop`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CollaborationFile`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
 
@@ -18,6 +18,10 @@ abstract class CollaborationEngine implements RustOpaqueInterface {
   });
 
   bool applyRemoteUpdate({required String filePath, required List<int> update});
+
+  Future<void> closeSession();
+
+  List<Uint8List> drainReceivedBytes();
 
   Uint8List encodeFullUpdate({required String filePath});
 
@@ -35,7 +39,12 @@ abstract class CollaborationEngine implements RustOpaqueInterface {
   factory CollaborationEngine() =>
       RustLib.instance.api.crateApiCollaborationCollaborationEngineNew();
 
-  Future<void> startSession();
+  Future<bool> sendBytesToInvite({
+    required String invite,
+    required List<int> payload,
+  });
+
+  Future<String> startSession();
 }
 
 class RustTextOperation {

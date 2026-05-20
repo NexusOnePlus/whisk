@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1920715800;
+  int get rustContentHash => -2066275078;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -89,6 +89,14 @@ abstract class RustLibApi extends BaseApi {
     required CollaborationEngine that,
     required String filePath,
     required List<int> update,
+  });
+
+  Future<void> crateApiCollaborationCollaborationEngineCloseSession({
+    required CollaborationEngine that,
+  });
+
+  List<Uint8List> crateApiCollaborationCollaborationEngineDrainReceivedBytes({
+    required CollaborationEngine that,
   });
 
   Uint8List crateApiCollaborationCollaborationEngineEncodeFullUpdate({
@@ -120,7 +128,13 @@ abstract class RustLibApi extends BaseApi {
 
   CollaborationEngine crateApiCollaborationCollaborationEngineNew();
 
-  Future<void> crateApiCollaborationCollaborationEngineStartSession({
+  Future<bool> crateApiCollaborationCollaborationEngineSendBytesToInvite({
+    required CollaborationEngine that,
+    required String invite,
+    required List<int> payload,
+  });
+
+  Future<String> crateApiCollaborationCollaborationEngineStartSession({
     required CollaborationEngine that,
   });
 
@@ -221,6 +235,77 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiCollaborationCollaborationEngineCloseSession({
+    required CollaborationEngine that,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineCloseSessionConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineCloseSessionConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_close_session",
+        argNames: ["that"],
+      );
+
+  @override
+  List<Uint8List> crateApiCollaborationCollaborationEngineDrainReceivedBytes({
+    required CollaborationEngine that,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_list_prim_u_8_strict,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineDrainReceivedBytesConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineDrainReceivedBytesConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_drain_received_bytes",
+        argNames: ["that"],
+      );
+
+  @override
   Uint8List crateApiCollaborationCollaborationEngineEncodeFullUpdate({
     required CollaborationEngine that,
     required String filePath,
@@ -234,7 +319,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(filePath, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_prim_u_8_strict,
@@ -269,7 +354,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(filePath, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_prim_u_8_strict,
@@ -306,7 +391,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(filePath, serializer);
           sse_encode_list_prim_u_8_loose(stateVector, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_prim_u_8_strict,
@@ -341,7 +426,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(filePath, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -376,7 +461,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(filePath, serializer);
           sse_encode_String(text, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -403,7 +488,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -421,7 +506,49 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "CollaborationEngine_new", argNames: []);
 
   @override
-  Future<void> crateApiCollaborationCollaborationEngineStartSession({
+  Future<bool> crateApiCollaborationCollaborationEngineSendBytesToInvite({
+    required CollaborationEngine that,
+    required String invite,
+    required List<int> payload,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCollaborationEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(invite, serializer);
+          sse_encode_list_prim_u_8_loose(payload, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiCollaborationCollaborationEngineSendBytesToInviteConstMeta,
+        argValues: [that, invite, payload],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiCollaborationCollaborationEngineSendBytesToInviteConstMeta =>
+      const TaskConstMeta(
+        debugName: "CollaborationEngine_send_bytes_to_invite",
+        argNames: ["that", "invite", "payload"],
+      );
+
+  @override
+  Future<String> crateApiCollaborationCollaborationEngineStartSession({
     required CollaborationEngine that,
   }) {
     return handler.executeNormal(
@@ -435,12 +562,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 12,
             port: port_,
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
+          decodeSuccessData: sse_decode_String,
           decodeErrorData: null,
         ),
         constMeta:
@@ -465,7 +592,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -490,7 +617,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 14,
             port: port_,
           );
         },
@@ -559,6 +686,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustTextOperation dco_decode_box_autoadd_rust_text_operation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_rust_text_operation(raw);
+  }
+
+  @protected
+  List<Uint8List> dco_decode_list_list_prim_u_8_strict(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_list_prim_u_8_strict).toList();
   }
 
   @protected
@@ -665,6 +798,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_rust_text_operation(deserializer));
+  }
+
+  @protected
+  List<Uint8List> sse_decode_list_list_prim_u_8_strict(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <Uint8List>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_list_prim_u_8_strict(deserializer));
+    }
+    return ans_;
   }
 
   @protected
@@ -786,6 +933,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_list_prim_u_8_strict(
+    List<Uint8List> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_list_prim_u_8_strict(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_loose(
     List<int> self,
     SseSerializer serializer,
@@ -896,6 +1055,12 @@ class CollaborationEngineImpl extends RustOpaque
         update: update,
       );
 
+  Future<void> closeSession() => RustLib.instance.api
+      .crateApiCollaborationCollaborationEngineCloseSession(that: this);
+
+  List<Uint8List> drainReceivedBytes() => RustLib.instance.api
+      .crateApiCollaborationCollaborationEngineDrainReceivedBytes(that: this);
+
   Uint8List encodeFullUpdate({required String filePath}) => RustLib.instance.api
       .crateApiCollaborationCollaborationEngineEncodeFullUpdate(
         that: this,
@@ -934,6 +1099,16 @@ class CollaborationEngineImpl extends RustOpaque
             text: text,
           );
 
-  Future<void> startSession() => RustLib.instance.api
+  Future<bool> sendBytesToInvite({
+    required String invite,
+    required List<int> payload,
+  }) => RustLib.instance.api
+      .crateApiCollaborationCollaborationEngineSendBytesToInvite(
+        that: this,
+        invite: invite,
+        payload: payload,
+      );
+
+  Future<String> startSession() => RustLib.instance.api
       .crateApiCollaborationCollaborationEngineStartSession(that: this);
 }

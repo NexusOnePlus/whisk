@@ -9,6 +9,7 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 flutter_rust_bridge = "=2.12.0"
 iroh = "0.98.2"
+serde_json = "1.0.149"
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
 yrs = "0.26.0"
 

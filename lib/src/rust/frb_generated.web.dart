@@ -53,6 +53,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RustTextOperation dco_decode_box_autoadd_rust_text_operation(dynamic raw);
 
   @protected
+  List<Uint8List> dco_decode_list_list_prim_u_8_strict(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
@@ -99,6 +102,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustTextOperation sse_decode_box_autoadd_rust_text_operation(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<Uint8List> sse_decode_list_list_prim_u_8_strict(
     SseDeserializer deserializer,
   );
 
@@ -158,6 +166,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_rust_text_operation(
     RustTextOperation self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_list_prim_u_8_strict(
+    List<Uint8List> self,
     SseSerializer serializer,
   );
 
