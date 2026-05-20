@@ -123,12 +123,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     final activeFile = _activeFile;
     final renderFile = _canWriteLocalFiles
         ? activeFile
-        : WhiskFile(
-            path: activeFile.path,
-            name: activeFile.name,
-            extension: activeFile.extension,
-            content: activeFile.content,
-          );
+        : await _guestDraftFileFor(activeFile);
     final environmentId = selectedEnvironment.id;
     final result = await renderService.render(
       environmentId: selectedEnvironment.id,
@@ -358,6 +353,18 @@ class WorkspaceViewModel extends ChangeNotifier {
     final file = File(await _guestDraftPathFor(_activeFile));
     await file.parent.create(recursive: true);
     await file.writeAsString(_activeFile.content);
+  }
+
+  Future<WhiskFile> _guestDraftFileFor(WhiskFile file) async {
+    final draftPath = await _guestDraftPathFor(file);
+    return WhiskFile(
+      path: draftPath,
+      name: file.name,
+      extension: file.extension,
+      content: file.content,
+      projectRoot: _guestDraftRoot!.path,
+      isDirty: file.isDirty,
+    );
   }
 
   Future<String> _guestDraftPathFor(WhiskFile file) async {

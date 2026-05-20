@@ -46,7 +46,7 @@ void main() {
     },
   );
 
-  test('guest collaboration renders from a temp workspace', () async {
+  test('guest collaboration renders from its draft workspace cache', () async {
     final temp = await Directory.systemTemp.createTemp('whisk-render-test-');
     addTearDown(() => temp.delete(recursive: true));
 
@@ -69,12 +69,18 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(await viewModel.joinCollaborationInvite('invite'), isTrue);
+    viewModel.updateActiveContent('guest render edit');
+    await viewModel.saveActiveFile();
+    final draftPath = viewModel.guestDraftPathForTesting(source.path);
+    expect(draftPath, isNotNull);
+
     await viewModel.renderActiveFile();
 
     expect(renderService.lastFile, isNotNull);
-    expect(renderService.lastFile!.path, source.path);
-    expect(renderService.lastFile!.content, 'guest edit');
-    expect(renderService.lastFile!.projectRoot, isNull);
+    expect(renderService.lastFile!.path, draftPath);
+    expect(renderService.lastFile!.content, 'guest render edit');
+    expect(renderService.lastFile!.projectRoot, isNotNull);
+    expect(renderService.lastFile!.projectRoot, isNot(temp.path));
   });
 }
 
