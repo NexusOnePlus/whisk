@@ -95,6 +95,7 @@ class CollaborationServiceP2p
 
   @override
   Future<void> disconnect() async {
+    await _broadcastGoodbye();
     await _transport.disconnect();
     _irohInboxTimer?.cancel();
     _irohInboxTimer = null;
@@ -309,6 +310,10 @@ class CollaborationServiceP2p
         _handleIrohPresence(envelope);
         continue;
       }
+      if (envelope.type == 'goodbye') {
+        _handleIrohGoodbye(envelope);
+        continue;
+      }
       if (envelope.type == 'snapshot_request') {
         _handleSnapshotRequest(envelope);
         continue;
@@ -439,6 +444,26 @@ class CollaborationServiceP2p
     final peer = envelope.peer;
     if (peer == null || peer.id == peerId) return;
     _irohPresence[peer.id] = peer;
+    _rebuildIrohPeers();
+    _publishCombinedPeers();
+  }
+
+  Future<void> _broadcastGoodbye() async {
+    final engine = _engine;
+    if (engine == null) return;
+    final payload = _encodeIrohEnvelope(type: 'goodbye', peerId: peerId);
+    await Future.wait([
+      for (final target in _activeRemoteTargets())
+        engine.sendBytesToInvite(invite: target.invite, payload: payload),
+    ]).timeout(const Duration(milliseconds: 800), onTimeout: () => const []);
+  }
+
+  void _handleIrohGoodbye(_IrohEnvelope envelope) {
+    final remotePeerId = envelope.peerId;
+    if (remotePeerId == null || remotePeerId == peerId) return;
+    _remoteInvites.remove(remotePeerId);
+    _irohPresence.remove(remotePeerId);
+    _remoteStateVectors.remove(remotePeerId);
     _rebuildIrohPeers();
     _publishCombinedPeers();
   }
