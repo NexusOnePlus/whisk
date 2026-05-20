@@ -61,6 +61,7 @@ class CollaborationServiceP2p
   String? _joinedInvite;
   final _remoteInvites = <String, String>{};
   final _irohPresence = <String, CollaborationPeer>{};
+  final _remoteStateVectors = <String, Map<String, List<int>>>{};
   List<CollaborationPeer> _localTransportPeers = const [];
   List<CollaborationPeer> _irohPeers = const [];
   Timer? _irohInboxTimer;
@@ -103,6 +104,7 @@ class CollaborationServiceP2p
     _joinedInvite = null;
     _remoteInvites.clear();
     _irohPresence.clear();
+    _remoteStateVectors.clear();
     _localTransportPeers = const [];
     _irohPeers = const [];
     _connected = false;
@@ -227,15 +229,49 @@ class CollaborationServiceP2p
     final engine = _engine;
     if (engine == null) return;
 
-    final payload = _encodeIrohEnvelope(
-      type: 'crdt_update',
-      peerId: peerId,
-      filePath: filePath,
-      update: engine.encodeFullUpdate(filePath: filePath),
-    );
-    for (final invite in _activeRemoteInvites()) {
-      unawaited(engine.sendBytesToInvite(invite: invite, payload: payload));
+    for (final target in _activeRemoteTargets()) {
+      unawaited(
+        _sendCrdtUpdateToTarget(
+          engine: engine,
+          filePath: filePath,
+          target: target,
+        ),
+      );
     }
+  }
+
+  Future<void> _sendCrdtUpdateToTarget({
+    required CollaborationEngine engine,
+    required String filePath,
+    required ({String? peerId, String invite}) target,
+  }) async {
+    final remoteStateVector = _stateVectorFor(
+      peerId: target.peerId ?? target.invite,
+      filePath: filePath,
+    );
+    final update = engine.encodeUpdateSince(
+      filePath: filePath,
+      stateVector: remoteStateVector,
+    );
+    if (update.isEmpty) return;
+
+    final localStateVector = engine.encodeStateVector(filePath: filePath);
+    final sent = await engine.sendBytesToInvite(
+      invite: target.invite,
+      payload: _encodeIrohEnvelope(
+        type: 'crdt_update',
+        peerId: peerId,
+        filePath: filePath,
+        update: update,
+        stateVector: localStateVector,
+      ),
+    );
+    if (!sent) return;
+    _setStateVectorFor(
+      peerId: target.peerId ?? target.invite,
+      filePath: filePath,
+      stateVector: localStateVector,
+    );
   }
 
   void _startIrohInboxPolling() {
@@ -271,6 +307,13 @@ class CollaborationServiceP2p
         continue;
       }
       final newText = engine.getText(filePath: envelope.filePath!);
+      if (envelope.peerId != null && envelope.stateVector != null) {
+        _setStateVectorFor(
+          peerId: envelope.peerId!,
+          filePath: envelope.filePath!,
+          stateVector: envelope.stateVector!,
+        );
+      }
       final operation = _operationFromDiff(oldText, newText);
       if (operation == null) continue;
       _textController.add(
@@ -289,6 +332,7 @@ class CollaborationServiceP2p
     String? invite,
     String? filePath,
     List<int>? update,
+    List<int>? stateVector,
     CollaborationPeer? peer,
   }) {
     final payload = <String, Object?>{'type': type};
@@ -296,6 +340,9 @@ class CollaborationServiceP2p
     if (invite != null) payload['invite'] = invite;
     if (filePath != null) payload['filePath'] = filePath;
     if (update != null) payload['update'] = base64Encode(update);
+    if (stateVector != null) {
+      payload['stateVector'] = base64Encode(stateVector);
+    }
     if (peer != null) {
       payload['peer'] = {
         'id': peer.id,
@@ -320,6 +367,7 @@ class CollaborationServiceP2p
       final invite = decoded['invite'];
       final filePath = decoded['filePath'];
       final update = decoded['update'];
+      final stateVector = decoded['stateVector'];
       final peer = decoded['peer'];
       return _IrohEnvelope(
         type: type,
@@ -327,6 +375,7 @@ class CollaborationServiceP2p
         invite: invite is String ? invite : null,
         filePath: filePath is String ? filePath : null,
         update: update is String ? base64Decode(update) : null,
+        stateVector: stateVector is String ? base64Decode(stateVector) : null,
         peer: peer is Map<String, Object?> ? _decodePeer(peer) : null,
       );
     } catch (_) {
@@ -341,6 +390,10 @@ class CollaborationServiceP2p
     if (remotePeerId == peerId) return;
     final isNewPeer = !_remoteInvites.containsKey(remotePeerId);
     _remoteInvites[remotePeerId] = invite;
+    final inviteStateVectors = _remoteStateVectors.remove(invite);
+    if (inviteStateVectors != null) {
+      _remoteStateVectors[remotePeerId] = inviteStateVectors;
+    }
     _irohPresence.putIfAbsent(
       remotePeerId,
       () => CollaborationPeer(
@@ -416,6 +469,39 @@ class CollaborationServiceP2p
     }
   }
 
+  Iterable<({String? peerId, String invite})> _activeRemoteTargets() sync* {
+    final seen = <String>{};
+    final joinedInvite = _joinedInvite;
+    if (joinedInvite != null && seen.add(joinedInvite)) {
+      yield (peerId: null, invite: joinedInvite);
+    }
+    for (final entry in _remoteInvites.entries) {
+      if (seen.add(entry.value)) {
+        yield (peerId: entry.key, invite: entry.value);
+      }
+    }
+  }
+
+  List<int> _stateVectorFor({
+    required String peerId,
+    required String filePath,
+  }) {
+    return _remoteStateVectors[peerId]?[filePath] ?? const <int>[];
+  }
+
+  void _setStateVectorFor({
+    required String peerId,
+    required String filePath,
+    required List<int> stateVector,
+  }) {
+    _remoteStateVectors.putIfAbsent(
+      peerId,
+      () => <String, List<int>>{},
+    )[filePath] = List.unmodifiable(
+      stateVector,
+    );
+  }
+
   void _publishCombinedPeers() {
     final seen = <String>{};
     final combined = <CollaborationPeer>[];
@@ -467,6 +553,7 @@ class _IrohEnvelope {
     this.invite,
     this.filePath,
     this.update,
+    this.stateVector,
     this.peer,
   });
 
@@ -475,5 +562,6 @@ class _IrohEnvelope {
   final String? invite;
   final String? filePath;
   final Uint8List? update;
+  final Uint8List? stateVector;
   final CollaborationPeer? peer;
 }
