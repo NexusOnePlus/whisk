@@ -95,16 +95,16 @@ class WhiskEditorBuffer {
     final safeStart = start.clamp(0, _text.length);
     final safeEnd = end.clamp(safeStart, _text.length);
     final deleted = _text.substring(safeStart, safeEnd);
-    
+
     _replacePieces(safeStart, safeEnd, text);
     _text = _text.replaceRange(safeStart, safeEnd, text);
-    
+
     _updateLineStartsIncremental(
       offset: safeStart,
       deletedLength: deleted.length,
       insertedText: text,
     );
-    
+
     return EditorTextOperation(
       offset: safeStart,
       deletedText: deleted,
@@ -121,7 +121,7 @@ class WhiskEditorBuffer {
     final delta = insertedText.length - deletedLength;
 
     final newStarts = <int>[];
-    
+
     // 1. Keep line starts before and at the edit offset
     for (final start in _lineStarts) {
       if (start <= offset) {

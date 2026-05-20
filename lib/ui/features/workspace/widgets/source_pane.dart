@@ -376,22 +376,29 @@ class _EditorStackState extends State<_EditorStack> {
           byWord: true,
           expand: true,
         ),
-        SingleActivator(LogicalKeyboardKey.home):
-            const _MoveSelectionIntent(direction: EditorMoveDirection.home),
-        SingleActivator(LogicalKeyboardKey.end):
-            const _MoveSelectionIntent(direction: EditorMoveDirection.end),
-        SingleActivator(LogicalKeyboardKey.home, shift: true):
-            const _MoveSelectionIntent(
+        SingleActivator(LogicalKeyboardKey.home): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.home,
+        ),
+        SingleActivator(LogicalKeyboardKey.end): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.end,
+        ),
+        SingleActivator(
+          LogicalKeyboardKey.home,
+          shift: true,
+        ): const _MoveSelectionIntent(
           direction: EditorMoveDirection.home,
           expand: true,
         ),
-        SingleActivator(LogicalKeyboardKey.end, shift: true):
-            const _MoveSelectionIntent(
+        SingleActivator(
+          LogicalKeyboardKey.end,
+          shift: true,
+        ): const _MoveSelectionIntent(
           direction: EditorMoveDirection.end,
           expand: true,
         ),
-        SingleActivator(LogicalKeyboardKey.pageUp):
-            const _MoveSelectionIntent(direction: EditorMoveDirection.pageUp),
+        SingleActivator(LogicalKeyboardKey.pageUp): const _MoveSelectionIntent(
+          direction: EditorMoveDirection.pageUp,
+        ),
         SingleActivator(LogicalKeyboardKey.pageDown):
             const _MoveSelectionIntent(direction: EditorMoveDirection.pageDown),
         SingleActivator(LogicalKeyboardKey.keyA, control: true):
@@ -451,9 +458,11 @@ class _EditorStackState extends State<_EditorStack> {
                                 widget.controller,
                               ]),
                               builder: (context, _) {
-                                final lineHeight = (widget.style.fontSize ?? 14) *
+                                final lineHeight =
+                                    (widget.style.fontSize ?? 14) *
                                     (widget.style.height ?? 1.45);
-                                final scrollOffset = widget.scrollController.hasClients
+                                final scrollOffset =
+                                    widget.scrollController.hasClients
                                     ? widget.scrollController.offset
                                     : 0.0;
                                 final firstLine = (scrollOffset / lineHeight)
@@ -468,17 +477,25 @@ class _EditorStackState extends State<_EditorStack> {
                                         .ceil()
                                         .clamp(
                                           0,
-                                          widget.controller.buffer.lineCount - 1,
+                                          widget.controller.buffer.lineCount -
+                                              1,
                                         );
-    
+
                                 final lineWidgets = <Widget>[];
-                                for (var line = firstLine; line <= lastLine; line++) {
-                                  final lineText = widget.controller.buffer.lineText(line);
-                                  final span = widget.controller.highlighter.highlight(
-                                    text: lineText,
-                                    environmentId: widget.controller.environmentId,
-                                    baseStyle: widget.style,
-                                  );
+                                for (
+                                  var line = firstLine;
+                                  line <= lastLine;
+                                  line++
+                                ) {
+                                  final lineText = widget.controller.buffer
+                                      .lineText(line);
+                                  final span = widget.controller.highlighter
+                                      .highlight(
+                                        text: lineText,
+                                        environmentId:
+                                            widget.controller.environmentId,
+                                        baseStyle: widget.style,
+                                      );
                                   lineWidgets.add(
                                     Positioned(
                                       top: line * lineHeight,
@@ -492,7 +509,7 @@ class _EditorStackState extends State<_EditorStack> {
                                     ),
                                   );
                                 }
-    
+
                                 return Stack(
                                   clipBehavior: Clip.none,
                                   children: [
@@ -504,7 +521,7 @@ class _EditorStackState extends State<_EditorStack> {
                                           style: widget.style,
                                           visibleRange: (
                                             firstLine: firstLine,
-                                            lastLine: lastLine
+                                            lastLine: lastLine,
                                           ),
                                         ),
                                       ),
@@ -611,54 +628,63 @@ class _EditorStackState extends State<_EditorStack> {
   }
 
   void _insertText(String text) {
-    final sel = widget.controller.selection;
-    final start = sel.start.clamp(0, widget.controller.text.length);
-    final end = sel.end.clamp(0, widget.controller.text.length);
-    widget.controller.replaceRange(
-      start: start,
-      end: end,
-      replacement: text,
+    final controller = widget.controller;
+    final sel = controller.selection;
+    final start = sel.start.clamp(0, controller.text.length);
+    final end = sel.end.clamp(0, controller.text.length);
+    final oldText = controller.text;
+    final newText = oldText.replaceRange(start, end, text);
+    final newOffset = (start + text.length).clamp(0, newText.length);
+
+    // Set value via the setter so multi-cursor logic in
+    // WhiskEditorController._applyWithCursors is triggered.
+    controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newOffset),
+      composing: TextRange.empty,
     );
-    widget.onChanged(widget.controller.text);
+    widget.onChanged(controller.text);
   }
 
   void _handleBackspace({required bool byWord}) {
-    final sel = widget.controller.selection;
+    final controller = widget.controller;
+    final sel = controller.selection;
     if (sel.start != sel.end) {
       _insertText('');
     } else if (sel.start > 0) {
-      int deleteStart;
-      if (byWord) {
-        deleteStart = _previousWordBoundary(sel.start);
-      } else {
-        deleteStart = sel.start - 1;
-      }
-      widget.controller.replaceRange(
-        start: deleteStart,
-        end: sel.start,
-        replacement: '',
+      final deleteStart = byWord
+          ? _previousWordBoundary(sel.start)
+          : sel.start - 1;
+      final oldText = controller.text;
+      final newText = oldText.replaceRange(deleteStart, sel.start, '');
+      controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: deleteStart.clamp(0, newText.length),
+        ),
+        composing: TextRange.empty,
       );
-      widget.onChanged(widget.controller.text);
+      widget.onChanged(controller.text);
     }
   }
 
   void _handleDelete({required bool byWord}) {
-    final sel = widget.controller.selection;
+    final controller = widget.controller;
+    final sel = controller.selection;
     if (sel.start != sel.end) {
       _insertText('');
-    } else if (sel.start < widget.controller.text.length) {
-      int deleteEnd;
-      if (byWord) {
-        deleteEnd = _nextWordBoundary(sel.start);
-      } else {
-        deleteEnd = sel.start + 1;
-      }
-      widget.controller.replaceRange(
-        start: sel.start,
-        end: deleteEnd,
-        replacement: '',
+    } else if (sel.start < controller.text.length) {
+      final deleteEnd = byWord ? _nextWordBoundary(sel.start) : sel.start + 1;
+      final oldText = controller.text;
+      final newText = oldText.replaceRange(sel.start, deleteEnd, '');
+      controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: sel.start.clamp(0, newText.length),
+        ),
+        composing: TextRange.empty,
       );
-      widget.onChanged(widget.controller.text);
+      widget.onChanged(controller.text);
     }
   }
 
@@ -811,12 +837,15 @@ class _EditorStackState extends State<_EditorStack> {
         (widget.style.fontSize ?? 14) * (widget.style.height ?? 1.45);
     final x = (localPosition.dx - 18).clamp(0.0, double.infinity);
     final y = (localPosition.dy - 16).clamp(0.0, double.infinity);
-    final line = (y / lineHeight).floor().clamp(0, widget.controller.buffer.lineCount - 1);
-    
+    final line = (y / lineHeight).floor().clamp(
+      0,
+      widget.controller.buffer.lineCount - 1,
+    );
+
     final lineText = widget.controller.buffer.lineText(line);
     final charWidth = _SourcePaneState._charWidth;
     final column = (x / charWidth).round().clamp(0, lineText.length);
-    
+
     return widget.controller.buffer.offsetForPosition(
       EditorTextPosition(line: line, column: column),
     );
@@ -1027,10 +1056,7 @@ class _EditorOverlayPainter extends CustomPainter {
 
         _paintSelection(
           canvas,
-          selection: TextSelection(
-            baseOffset: start,
-            extentOffset: end,
-          ),
+          selection: TextSelection(baseOffset: start, extentOffset: end),
           lineHeight: lineHeight,
           charWidth: charWidth,
           paint: primarySelectionPaint,
@@ -1071,10 +1097,7 @@ class _EditorOverlayPainter extends CustomPainter {
 
       _paintSelection(
         canvas,
-        selection: TextSelection(
-          baseOffset: start,
-          extentOffset: end,
-        ),
+        selection: TextSelection(baseOffset: start, extentOffset: end),
         lineHeight: lineHeight,
         charWidth: charWidth,
         paint: secondarySelectionPaint,
@@ -1104,17 +1127,12 @@ class _EditorOverlayPainter extends CustomPainter {
           ? endPosition.column
           : lineEnd - lineStart;
       if (endColumn <= startColumn) continue;
-      
+
       final left = startColumn * charWidth;
       final width = (endColumn - startColumn) * charWidth;
-      
+
       canvas.drawRect(
-        Rect.fromLTWH(
-          left,
-          line * lineHeight,
-          width,
-          lineHeight,
-        ),
+        Rect.fromLTWH(left, line * lineHeight, width, lineHeight),
         paint,
       );
     }
@@ -1138,12 +1156,9 @@ class _EditorOverlayPainter extends CustomPainter {
         column: controller.buffer.lineText(position.line).length,
       );
     }
-    
+
     final caretX = position.column * charWidth;
-    final caret = Offset(
-      caretX,
-      position.line * lineHeight,
-    );
+    final caret = Offset(caretX, position.line * lineHeight);
     canvas.drawLine(caret, caret.translate(0, height), paint);
   }
 

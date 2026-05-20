@@ -34,9 +34,9 @@ class WhiskEditorController extends TextEditingController {
     final oldText = text;
     final isComposing =
         newValue.composing.isValid && !newValue.composing.isCollapsed;
-    
+
     EditorTextOperation? operation;
-    
+
     if (!_applyingHistory && !_syncingFromModel && !_applyingCursors) {
       if (isComposing) {
         _textBeforeComposition ??= oldText;
@@ -57,7 +57,7 @@ class WhiskEditorController extends TextEditingController {
         _textBeforeComposition = null;
         _selectionBeforeComposition = null;
       }
- 
+
       if (oldText != newValue.text) {
         operation = _operationFromDiff(oldText, newValue.text);
         if (operation != null && !isComposing) {
@@ -85,9 +85,12 @@ class WhiskEditorController extends TextEditingController {
         }
       }
     }
-    
+
     if (oldText != newValue.text) {
-      if (!_applyingHistory && !_syncingFromModel && !_applyingCursors && operation != null) {
+      if (!_applyingHistory &&
+          !_syncingFromModel &&
+          !_applyingCursors &&
+          operation != null) {
         buffer.apply(operation);
       } else {
         buffer.setText(newValue.text);
@@ -453,7 +456,8 @@ class WhiskEditorController extends TextEditingController {
     if (start) {
       return buffer.lineStarts[position.line];
     } else {
-      return buffer.lineStarts[position.line] + buffer.lineText(position.line).length;
+      return buffer.lineStarts[position.line] +
+          buffer.lineText(position.line).length;
     }
   }
 
@@ -536,10 +540,7 @@ class WhiskEditorController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
-    return TextSpan(
-      text: text,
-      style: style,
-    );
+    return TextSpan(text: text, style: style);
   }
 }
 
