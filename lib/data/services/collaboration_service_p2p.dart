@@ -260,7 +260,7 @@ class CollaborationServiceP2p
         insertedText: update.operation.insertedText,
       ),
     );
-    _broadcastCrdtUpdate(update.filePath);
+    _broadcastCrdtUpdate(update.filePath, operation: update.operation);
     _transport.broadcastTextUpdate(update);
   }
 
@@ -298,7 +298,10 @@ class CollaborationServiceP2p
     return _peerCounter;
   }
 
-  void _broadcastCrdtUpdate(String filePath) {
+  void _broadcastCrdtUpdate(
+    String filePath, {
+    EditorTextOperation? operation,
+  }) {
     final engine = _engine;
     if (engine == null) return;
 
@@ -308,6 +311,7 @@ class CollaborationServiceP2p
           engine: engine,
           filePath: filePath,
           target: target,
+          operation: operation,
         ),
       );
     }
@@ -317,6 +321,7 @@ class CollaborationServiceP2p
     required CollaborationEngine engine,
     required String filePath,
     required ({String? peerId, String invite}) target,
+    EditorTextOperation? operation,
   }) async {
     final remoteStateVector = _stateVectorFor(
       peerId: target.peerId ?? target.invite,
@@ -337,6 +342,7 @@ class CollaborationServiceP2p
         filePath: filePath,
         update: update,
         stateVector: localStateVector,
+        operation: operation,
       ),
     );
     if (!sent) return;
@@ -410,7 +416,9 @@ class CollaborationServiceP2p
           stateVector: envelope.stateVector!,
         );
       }
-      final operation = _operationFromDiff(oldText, newText);
+      final operation =
+          _operationFromDiff(oldText, newText) ??
+          _operationFromEnvelope(oldText, newText, envelope.operation);
       if (operation == null) continue;
       _textController.add(
         CollaborationTextUpdate(
@@ -431,6 +439,7 @@ class CollaborationServiceP2p
     List<int>? stateVector,
     CollaborationPeer? peer,
     List<CollaborationFileEntry>? files,
+    EditorTextOperation? operation,
   }) {
     final payload = <String, Object?>{'type': type};
     if (peerId != null) payload['peerId'] = peerId;
@@ -457,6 +466,13 @@ class CollaborationServiceP2p
           {'path': file.path, 'name': file.name, 'extension': file.extension},
       ];
     }
+    if (operation != null) {
+      payload['operation'] = {
+        'offset': operation.offset,
+        'deletedText': operation.deletedText,
+        'insertedText': operation.insertedText,
+      };
+    }
     return utf8.encode(jsonEncode(payload));
   }
 
@@ -473,6 +489,7 @@ class CollaborationServiceP2p
       final stateVector = decoded['stateVector'];
       final peer = decoded['peer'];
       final files = decoded['files'];
+      final operation = decoded['operation'];
       return _IrohEnvelope(
         type: type,
         peerId: peerId is String ? peerId : null,
@@ -482,6 +499,9 @@ class CollaborationServiceP2p
         stateVector: stateVector is String ? base64Decode(stateVector) : null,
         peer: peer is Map<String, Object?> ? _decodePeer(peer) : null,
         files: files is List<Object?> ? _decodeFiles(files) : null,
+        operation: operation is Map<String, Object?>
+            ? _decodeOperation(operation)
+            : null,
       );
     } catch (_) {
       return null;
@@ -751,23 +771,23 @@ class CollaborationServiceP2p
 
   Iterable<String> _activeRemoteInvites() sync* {
     final seen = <String>{};
-    final joinedInvite = _joinedInvite;
-    if (joinedInvite != null && seen.add(joinedInvite)) yield joinedInvite;
     for (final invite in _remoteInvites.values) {
       if (seen.add(invite)) yield invite;
     }
+    final joinedInvite = _joinedInvite;
+    if (joinedInvite != null && seen.add(joinedInvite)) yield joinedInvite;
   }
 
   Iterable<({String? peerId, String invite})> _activeRemoteTargets() sync* {
     final seen = <String>{};
-    final joinedInvite = _joinedInvite;
-    if (joinedInvite != null && seen.add(joinedInvite)) {
-      yield (peerId: null, invite: joinedInvite);
-    }
     for (final entry in _remoteInvites.entries) {
       if (seen.add(entry.value)) {
         yield (peerId: entry.key, invite: entry.value);
       }
+    }
+    final joinedInvite = _joinedInvite;
+    if (joinedInvite != null && seen.add(joinedInvite)) {
+      yield (peerId: null, invite: joinedInvite);
     }
   }
 
@@ -833,6 +853,39 @@ class CollaborationServiceP2p
       insertedText: newText.substring(prefix, newSuffix),
     );
   }
+
+  EditorTextOperation? _decodeOperation(Map<String, Object?> value) {
+    final offset = value['offset'];
+    final deletedText = value['deletedText'];
+    final insertedText = value['insertedText'];
+    if (offset is! int || deletedText is! String || insertedText is! String) {
+      return null;
+    }
+    return EditorTextOperation(
+      offset: offset,
+      deletedText: deletedText,
+      insertedText: insertedText,
+    );
+  }
+
+  EditorTextOperation? _operationFromEnvelope(
+    String oldText,
+    String newText,
+    EditorTextOperation? operation,
+  ) {
+    if (operation == null) return null;
+    final start = operation.offset;
+    if (start < 0 || start > oldText.length) return null;
+    final end = start + operation.deletedText.length;
+    if (end < start || end > oldText.length) return null;
+    if (oldText.substring(start, end) != operation.deletedText) return null;
+    final applied = oldText.replaceRange(
+      start,
+      end,
+      operation.insertedText,
+    );
+    return applied == newText ? operation : null;
+  }
 }
 
 class _IrohEnvelope {
@@ -845,6 +898,7 @@ class _IrohEnvelope {
     this.stateVector,
     this.peer,
     this.files,
+    this.operation,
   });
 
   final String type;
@@ -855,4 +909,5 @@ class _IrohEnvelope {
   final Uint8List? stateVector;
   final CollaborationPeer? peer;
   final List<CollaborationFileEntry>? files;
+  final EditorTextOperation? operation;
 }
