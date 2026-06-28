@@ -26,9 +26,9 @@ class GlassInputDialog extends StatelessWidget {
       ),
       child: Container(
           width: 320,
-          color: const Color(0xFF22262E),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
+            color: const Color(0xFF22262E),
             border: Border.all(color: kBorder),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -129,9 +129,9 @@ class GlassConfirmDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       child: Container(
           width: 320,
-          color: const Color(0xFF22262E),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
+            color: const Color(0xFF22262E),
             border: Border.all(color: kBorder),
             borderRadius: BorderRadius.circular(16),
           ),
