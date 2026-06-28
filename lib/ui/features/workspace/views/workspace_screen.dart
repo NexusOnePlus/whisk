@@ -24,6 +24,7 @@ class WorkspaceScreen extends StatefulWidget {
     this.onCloseProject,
     this.onTogglePin,
     this.onSwitchProject,
+    this.onAbout,
   });
 
   final WorkspaceViewModel viewModel;
@@ -33,6 +34,7 @@ class WorkspaceScreen extends StatefulWidget {
   final VoidCallback? onCloseProject;
   final ValueChanged<String>? onTogglePin;
   final ValueChanged<String>? onSwitchProject;
+  final VoidCallback? onAbout;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -356,6 +358,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                                   onCloseWorkspace: widget.onCloseWorkspace,
                                   onCreateInvite: _createCollaborationInvite,
                                   onJoinInvite: _joinCollaborationInvite,
+                                  onAbout: widget.onAbout,
                                 ),
                                 const SizedBox(height: 6),
                                 EditorContentFrame(
