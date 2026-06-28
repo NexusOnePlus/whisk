@@ -11,11 +11,22 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.PUB_CACHE }}
+            .dart_tool/
+            build/
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
 
       - run: dart pub global activate cider
       - run: dart pub get
@@ -43,7 +54,7 @@ jobs:
           $version = "${{ steps.version.outputs.VERSION }}"
           $content = Get-Content installer/whisk.iss -Raw
           $content = $content -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"$version`""
-          Set-Content installer/whisk.iss -Value $content
+          [System.IO.File]::WriteAllText("installer/whisk.iss", $content, [System.Text.UTF8Encoding]::new($false))
 
       - name: Compile Inno Setup
         run: |
