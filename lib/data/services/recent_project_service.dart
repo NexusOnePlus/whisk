@@ -26,6 +26,7 @@ class RecentProjectService extends ChangeNotifier {
     final file = File(path);
     if (!await file.exists()) {
       _projects = [];
+      notifyListeners();
       return;
     }
     try {
@@ -37,6 +38,7 @@ class RecentProjectService extends ChangeNotifier {
     } catch (_) {
       _projects = [];
     }
+    notifyListeners();
   }
 
   Future<void> save(RecentProject project) async {

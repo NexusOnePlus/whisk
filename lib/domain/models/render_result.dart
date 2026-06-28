@@ -6,30 +6,37 @@ class RenderResult {
     this.pdfPath,
     this.engine,
     this.log = '',
+    this.content,
   });
 
   const RenderResult.idle() : this(state: RenderState.idle);
 
   const RenderResult.rendering() : this(state: RenderState.rendering);
 
-  const RenderResult.success({
-    required String pdfPath,
-    required String engine,
+  factory RenderResult.success({
+    String? pdfPath,
+    String? engine,
     String log = '',
-  }) : this(
-         state: RenderState.success,
-         pdfPath: pdfPath,
-         engine: engine,
-         log: log,
-       );
+    String? content,
+  }) {
+    return RenderResult(
+      state: RenderState.success,
+      pdfPath: pdfPath,
+      engine: engine,
+      log: log,
+      content: content,
+    );
+  }
 
-  const RenderResult.failed(String log)
-    : this(state: RenderState.failed, log: log);
+  factory RenderResult.failed(String log) {
+    return RenderResult(state: RenderState.failed, log: log);
+  }
 
   final RenderState state;
   final String? pdfPath;
   final String? engine;
   final String log;
+  final String? content;
 
   bool get isRendering => state == RenderState.rendering;
   bool get hasPdf => pdfPath != null && pdfPath!.isNotEmpty;

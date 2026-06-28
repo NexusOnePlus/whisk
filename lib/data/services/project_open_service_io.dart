@@ -58,6 +58,51 @@ class ProjectOpenService {
     return files.firstOrNull;
   }
 
+  Future<WhiskProject?> pickProjectFromPath(String rootPath) async {
+    final root = Directory(rootPath);
+    if (!await root.exists()) return null;
+
+    final files = await _listProjectFiles(root);
+    if (files.isEmpty) return null;
+
+    final entry = _findEntryFile(root, files);
+    final content = entry != null ? await entry.readAsString() : '';
+
+    final entryFile = WhiskFile(
+      path: entry?.path ?? files.first.path,
+      name: entry != null
+          ? entry.uri.pathSegments.last
+          : files.first.uri.pathSegments.last,
+      extension: extensionOf(entry?.path ?? files.first.path),
+      content: content,
+      projectRoot: root.path,
+    );
+
+    final allFiles = <WhiskFile>[];
+    for (final file in files) {
+      final ext = extensionOf(file.path);
+      final isText = const {
+        '.tex', '.bib', '.sty', '.cls', '.typ', '.md', '.mmd',
+      }.contains(ext);
+      final fileContent = file.path == entry?.path
+          ? content
+          : isText ? await file.readAsString() : '';
+      allFiles.add(WhiskFile(
+        path: file.path,
+        name: file.uri.pathSegments.last,
+        extension: ext,
+        content: fileContent,
+        projectRoot: root.path,
+      ));
+    }
+
+    return WhiskProject(
+      rootPath: root.path,
+      files: allFiles,
+      entryFile: entryFile,
+    );
+  }
+
   Future<List<File>> listDirectoryFiles(String path) =>
       _listProjectFiles(Directory(path));
 
@@ -72,6 +117,14 @@ class ProjectOpenService {
 
     files.sort((a, b) => a.path.compareTo(b.path));
     return files;
+  }
+
+  Future<List<FileSystemEntity>> listDirectoryEntries(String path) async {
+    final dir = Directory(path);
+    if (!await dir.exists()) return const [];
+    final entries = await dir.list(followLinks: false).toList();
+    entries.sort((a, b) => a.path.compareTo(b.path));
+    return entries;
   }
 
   bool _isIgnoredPath(String rootPath, String path) {

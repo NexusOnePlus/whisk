@@ -8,7 +8,7 @@ class DocumentRenderService {
     required String environmentId,
     required WhiskFile file,
   }) async {
-    return const RenderResult.failed(
+    return RenderResult.failed(
       'Local rendering is not available on this platform yet. Use the future cloud renderer for web builds.',
     );
   }

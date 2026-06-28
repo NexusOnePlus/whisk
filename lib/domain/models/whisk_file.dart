@@ -6,6 +6,7 @@ class WhiskFile {
     required this.content,
     this.projectRoot,
     this.isDirty = false,
+    this.isDirectory = false,
   });
 
   final String path;
@@ -14,6 +15,7 @@ class WhiskFile {
   final String content;
   final String? projectRoot;
   final bool isDirty;
+  final bool isDirectory;
 
   bool get isImage => const {
     '.png',
@@ -33,6 +35,7 @@ class WhiskFile {
     String? content,
     String? projectRoot,
     bool? isDirty,
+    bool? isDirectory,
   }) {
     return WhiskFile(
       path: path ?? this.path,
@@ -41,6 +44,7 @@ class WhiskFile {
       content: content ?? this.content,
       projectRoot: projectRoot ?? this.projectRoot,
       isDirty: isDirty ?? this.isDirty,
+      isDirectory: isDirectory ?? this.isDirectory,
     );
   }
 }
