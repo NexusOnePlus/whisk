@@ -6,6 +6,12 @@ class EngineProvisionService {
       'Local engine provisioning is not available on this platform yet.',
     );
   }
+
+  Future<EngineResolution> ensureTypst() async {
+    return const EngineResolution.unavailable(
+      'Local engine provisioning is not available on this platform yet.',
+    );
+  }
 }
 
 class EngineResolution {

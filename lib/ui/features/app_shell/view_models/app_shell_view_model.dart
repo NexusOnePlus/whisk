@@ -135,6 +135,10 @@ class AppShellViewModel extends ChangeNotifier {
     final rootPath = project.rootPath;
     _saveRecentForPath(rootPath, 'folder');
 
+    final envIndex = const EnvironmentCatalog().listEnvironments().indexWhere(
+      (e) => e.extension == project.entryFile.extension,
+    );
+
     _workspaceViewModel?.dispose();
     for (final workspace in _collaborationViewModels) {
       workspace.dispose();
@@ -143,15 +147,14 @@ class AppShellViewModel extends ChangeNotifier {
     final workspace = WorkspaceViewModel(
       initialFile: project.entryFile,
       projectFiles: project.files,
+      startEnvIndex: envIndex >= 0 ? envIndex : 0,
       collaborationService: CollaborationServiceP2p(),
     );
     _workspaceViewModel = workspace;
     _mode = AppShellMode.workspace;
     notifyListeners();
 
-    if (project.entryFile.extension == '.tex') {
-      await workspace.renderActiveFile();
-    }
+    await workspace.renderActiveFile();
   }
 
   Future<bool> joinSharedWorkspace(String invite) async {

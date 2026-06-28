@@ -8,8 +8,10 @@ import 'package:path_provider/path_provider.dart';
 class EngineProvisionService {
   const EngineProvisionService();
 
-  static const _latestReleaseApi =
+  static const _tectonicReleaseApi =
       'https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest';
+  static const _typstReleaseApi =
+      'https://api.github.com/repos/typst/typst/releases/latest';
 
   Future<EngineResolution> ensureTectonic() async {
     final bundled = await _bundledTectonicPath();
@@ -61,7 +63,7 @@ class EngineProvisionService {
     final log = StringBuffer('Tectonic was not found locally.\n');
     try {
       final release = await http.get(
-        Uri.parse(_latestReleaseApi),
+        Uri.parse(_tectonicReleaseApi),
         headers: const {
           'Accept': 'application/vnd.github+json',
           'User-Agent': 'Whisk document renderer',
@@ -117,6 +119,103 @@ class EngineProvisionService {
       return EngineResolution.available(
         executablePath: output.path,
         log: '${log}Installed Tectonic at ${output.path}.',
+        wasProvisioned: true,
+      );
+    } on Object catch (error) {
+      return EngineResolution.unavailable('${log}Engine setup failed: $error');
+    }
+  }
+
+  Future<EngineResolution> ensureTypst() async {
+    final bundled = await _bundledTypstPath();
+    if (await File(bundled).exists()) {
+      return EngineResolution.available(executablePath: bundled);
+    }
+
+    final pathEngine = await _resolveFromPath('typst');
+    if (pathEngine != null) {
+      return EngineResolution.available(executablePath: pathEngine);
+    }
+
+    return _downloadTypst(toPath: bundled);
+  }
+
+  Future<String> _bundledTypstPath() async {
+    final support = await getApplicationSupportDirectory();
+    return [
+      support.path,
+      'engines',
+      'typst',
+      Platform.isWindows ? 'typst.exe' : 'typst',
+    ].join(Platform.pathSeparator);
+  }
+
+  Future<EngineResolution> _downloadTypst({required String toPath}) async {
+    if (!Platform.isWindows) {
+      return const EngineResolution.unavailable(
+        'Auto-download is currently wired for Windows only. Install typst in PATH on this platform.',
+      );
+    }
+
+    final log = StringBuffer('Typst was not found locally.\n');
+    try {
+      final release = await http.get(
+        Uri.parse(_typstReleaseApi),
+        headers: const {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'Whisk document renderer',
+        },
+      );
+      if (release.statusCode < 200 || release.statusCode >= 300) {
+        return EngineResolution.unavailable(
+          '${log}Could not query Typst releases: HTTP ${release.statusCode}.',
+        );
+      }
+
+      final json = jsonDecode(release.body) as Map<String, dynamic>;
+      final assets = (json['assets'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      final asset = assets.where((item) {
+        final name = item['name']?.toString().toLowerCase() ?? '';
+        return name.endsWith('.zip') && name.contains('x86_64-pc-windows-msvc');
+      }).firstOrNull;
+
+      final downloadUrl = asset?['browser_download_url']?.toString();
+      if (downloadUrl == null || downloadUrl.isEmpty) {
+        return EngineResolution.unavailable(
+          '${log}Could not find a Windows x86_64 Typst ZIP in the latest release.',
+        );
+      }
+
+      log.writeln('Downloading ${asset!['name']}');
+      final archiveResponse = await http.get(
+        Uri.parse(downloadUrl),
+        headers: const {'User-Agent': 'Whisk document renderer'},
+      );
+      if (archiveResponse.statusCode < 200 ||
+          archiveResponse.statusCode >= 300) {
+        return EngineResolution.unavailable(
+          '${log}Download failed: HTTP ${archiveResponse.statusCode}.',
+        );
+      }
+
+      final archive = ZipDecoder().decodeBytes(archiveResponse.bodyBytes);
+      final executable = archive.files
+          .where((file) => file.isFile && file.name.endsWith('typst.exe'))
+          .firstOrNull;
+      if (executable == null) {
+        return EngineResolution.unavailable(
+          '${log}Downloaded archive did not contain typst.exe.',
+        );
+      }
+
+      final output = File(toPath);
+      await output.parent.create(recursive: true);
+      await output.writeAsBytes(executable.content as List<int>);
+
+      return EngineResolution.available(
+        executablePath: output.path,
+        log: '${log}Installed Typst at ${output.path}.',
         wasProvisioned: true,
       );
     } on Object catch (error) {

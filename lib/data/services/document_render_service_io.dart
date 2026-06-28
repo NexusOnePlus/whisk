@@ -16,13 +16,13 @@ class DocumentRenderService {
     required String environmentId,
     required WhiskFile file,
   }) async {
-    if (environmentId != 'latex') {
-      return RenderResult.failed(
+    return switch (environmentId) {
+      'latex' => _renderLatex(file),
+      'typst' => _renderTypst(file),
+      _ => RenderResult.failed(
         'Renderer for $environmentId is not wired yet. Phase order is LaTeX, Typst, Markdown, then Mermaid.',
-      );
-    }
-
-    return _renderLatex(file);
+      ),
+    };
   }
 
   Future<RenderResult> _renderLatex(WhiskFile file) async {
@@ -110,6 +110,61 @@ class DocumentRenderService {
     );
   }
 
+  Future<RenderResult> _renderTypst(WhiskFile file) async {
+    final workspace = await _prepareWorkspace(file, engine: 'typst');
+    final root = workspace.projectRoot;
+    final build = workspace.buildRoot;
+
+    final source = File(workspace.sourcePath);
+    await source.writeAsString(file.content);
+
+    final typst = await engineProvisionService.ensureTypst();
+    final logs = StringBuffer();
+    logs
+      ..writeln('project: ${root.path}')
+      ..writeln('build: ${build.path}')
+      ..writeln('cache: ${workspace.cacheRoot.path}')
+      ..writeln(typst.log.trim())
+      ..writeln();
+
+    if (typst.available && typst.executablePath != null) {
+      final result = await _tryRun(
+        _RenderAttempt(
+          engine: 'typst',
+          executable: typst.executablePath!,
+          arguments: [
+            'compile',
+            workspace.entrypoint,
+            '${build.path}${Platform.pathSeparator}output.pdf',
+            '--root',
+            root.path,
+          ],
+        ),
+        root.path,
+        workspace.environment,
+      );
+      logs
+        ..writeln('> typst compile ${workspace.entrypoint}')
+        ..writeln(result.log.trim())
+        ..writeln();
+
+      if (result.success) {
+        final pdf = File('${build.path}${Platform.pathSeparator}output.pdf');
+        if (await pdf.exists()) {
+          return RenderResult.success(
+            pdfPath: pdf.path,
+            engine: 'typst',
+            log: logs.toString(),
+          );
+        }
+      }
+    }
+
+    return RenderResult.failed(
+      'Could not render Typst.\n\n${logs.toString()}',
+    );
+  }
+
   Future<_ProcessResult> _tryRun(
     _RenderAttempt attempt,
     String workingDirectory,
@@ -133,7 +188,7 @@ class DocumentRenderService {
     }
   }
 
-  Future<_RenderWorkspace> _prepareWorkspace(WhiskFile file) async {
+  Future<_RenderWorkspace> _prepareWorkspace(WhiskFile file, {String engine = 'latex'}) async {
     final support = await getApplicationSupportDirectory();
     final cacheRoot = Directory(
       '${support.path}${Platform.pathSeparator}cache',
@@ -141,24 +196,38 @@ class DocumentRenderService {
     await cacheRoot.create(recursive: true);
 
     final projectRoot = file.projectRoot == null
-        ? await Directory.systemTemp.createTemp('whisk-draft-latex-')
+        ? await Directory.systemTemp.createTemp('whisk-draft-$engine-')
         : Directory(file.projectRoot!);
 
     final whiskRoot = Directory(
       '${projectRoot.path}${Platform.pathSeparator}.whisk',
     );
     final buildRoot = Directory(
-      '${whiskRoot.path}${Platform.pathSeparator}build${Platform.pathSeparator}latex',
+      '${whiskRoot.path}${Platform.pathSeparator}build${Platform.pathSeparator}$engine',
     );
     await buildRoot.create(recursive: true);
 
+    final extension = switch (engine) {
+      'typst' => '.typ',
+      _ => '.tex',
+    };
     final sourcePath = file.projectRoot == null
-        ? '${projectRoot.path}${Platform.pathSeparator}main.tex'
+        ? '${projectRoot.path}${Platform.pathSeparator}main$extension'
         : file.path;
     final entrypoint = _relativeToProject(
       sourcePath: sourcePath,
       projectRoot: projectRoot.path,
     );
+
+    final env = <String, String>{
+      'WHISK_CACHE_DIR': cacheRoot.path,
+    };
+    if (engine == 'latex') {
+      env.addAll({
+        'TEXMFVAR': '${cacheRoot.path}${Platform.pathSeparator}texmf-var',
+        'TEXMFCONFIG': '${cacheRoot.path}${Platform.pathSeparator}texmf-config',
+      });
+    }
 
     return _RenderWorkspace(
       projectRoot: projectRoot,
@@ -167,11 +236,7 @@ class DocumentRenderService {
       sourcePath: sourcePath,
       entrypoint: entrypoint,
       buildArgument: buildRoot.path,
-      environment: {
-        'WHISK_CACHE_DIR': cacheRoot.path,
-        'TEXMFVAR': '${cacheRoot.path}${Platform.pathSeparator}texmf-var',
-        'TEXMFCONFIG': '${cacheRoot.path}${Platform.pathSeparator}texmf-config',
-      },
+      environment: env,
     );
   }
 
