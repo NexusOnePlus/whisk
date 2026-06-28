@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:whisk/data/repositories/environment_catalog.dart';
 import 'package:whisk/data/services/collaboration_service_p2p.dart';
+import 'package:whisk/data/services/pinned_project_service.dart';
 import 'package:whisk/data/services/project_open_service.dart';
 import 'package:whisk/data/services/recent_project_service.dart';
 import 'package:whisk/domain/models/recent_project.dart';
@@ -15,12 +16,21 @@ class AppShellViewModel extends ChangeNotifier {
   AppShellViewModel({this._projectOpenService = const ProjectOpenService()}) {
     _recentProjectService.addListener(_onRecentsChanged);
     _recentProjectService.load();
+    _pinnedProjectService.addListener(_onPinnedChanged);
+    _pinnedProjectService.load();
   }
 
   final RecentProjectService _recentProjectService = RecentProjectService();
+  final PinnedProjectService _pinnedProjectService = PinnedProjectService();
   List<RecentProject> get recentProjects => _recentProjectService.projects;
+  List<String> get pinnedProjects => _pinnedProjectService.pinnedPaths;
 
   void _onRecentsChanged() => notifyListeners();
+  void _onPinnedChanged() => notifyListeners();
+
+  void togglePinProject(String path) {
+    _pinnedProjectService.toggle(path);
+  }
 
   static const _localPeerColors = [
     Colors.cyanAccent,
@@ -118,12 +128,16 @@ class AppShellViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _saveRecentForPath(String path, String type) {
+  void _saveRecentForPath(String path, String type, {String? lastFilePath}) {
+    final existing = _recentProjectService.projects
+        .where((p) => p.path == path)
+        .firstOrNull;
     _recentProjectService.save(RecentProject(
       path: path,
       name: path.split(Platform.pathSeparator).last,
       type: type,
       lastOpened: DateTime.now().millisecondsSinceEpoch,
+      lastFilePath: lastFilePath ?? existing?.lastFilePath,
     ));
   }
 
@@ -133,7 +147,7 @@ class AppShellViewModel extends ChangeNotifier {
     if (project == null) return;
 
     final rootPath = project.rootPath;
-    _saveRecentForPath(rootPath, 'folder');
+    _saveRecentForPath(rootPath, 'folder', lastFilePath: project.entryFile.path);
 
     final envIndex = const EnvironmentCatalog().listEnvironments().indexWhere(
       (e) => e.extension == project.entryFile.extension,
@@ -226,14 +240,74 @@ class AppShellViewModel extends ChangeNotifier {
 
   void closeWorkspace() {
     if (_disposed) return;
+    _saveCurrentWorkspaceState();
+    _mode = AppShellMode.dashboard;
+    notifyListeners();
+  }
+
+  void _saveCurrentWorkspaceState() {
+    final workspace = _workspaceViewModel;
+    if (workspace == null) return;
+    final root = workspace.activeFile.projectRoot;
+    if (root == null) return;
+    final type = workspace.selectedEnvironment.id;
+    _saveRecentForPath(root, type, lastFilePath: workspace.activeFile.path);
+  }
+
+  Future<void> openRecentProject(RecentProject project) async {
+    if (_disposed) return;
+    final root = Directory(project.path);
+    if (!await root.exists()) return;
+
+    final diskProject = await _projectOpenService.pickProjectFromPath(project.path);
+    if (_disposed) return;
+    if (diskProject == null) return;
+
+    WhiskFile initialFile = diskProject.entryFile;
+    int envIndex = const EnvironmentCatalog().listEnvironments().indexWhere(
+      (e) => e.extension == diskProject.entryFile.extension,
+    );
+
+    if (project.lastFilePath != null) {
+      final saved = diskProject.files
+          .where((f) => f.path == project.lastFilePath)
+          .firstOrNull;
+      if (saved != null) {
+        initialFile = saved;
+        envIndex = const EnvironmentCatalog().listEnvironments().indexWhere(
+          (e) => e.extension == saved.extension,
+        );
+      }
+    }
+
+    _recentProjectService.save(RecentProject(
+      path: project.path,
+      name: project.name,
+      type: project.type,
+      lastOpened: DateTime.now().millisecondsSinceEpoch,
+      lastFilePath: initialFile.path,
+    ));
+
     _workspaceViewModel?.dispose();
     for (final workspace in _collaborationViewModels) {
       workspace.dispose();
     }
-    _workspaceViewModel = null;
     _collaborationViewModels = const [];
-    _mode = AppShellMode.dashboard;
+    final workspace = WorkspaceViewModel(
+      initialFile: initialFile,
+      projectFiles: diskProject.files,
+      startEnvIndex: envIndex >= 0 ? envIndex : 0,
+      collaborationService: CollaborationServiceP2p(),
+    );
+    _workspaceViewModel = workspace;
+    _mode = AppShellMode.workspace;
     notifyListeners();
+
+    await workspace.renderActiveFile();
+  }
+
+  void removeRecentProject(String path) {
+    _recentProjectService.remove(path);
   }
 
   WorkspaceViewModel _createLocalCollaborationWorkspace() {
@@ -255,6 +329,8 @@ class AppShellViewModel extends ChangeNotifier {
     for (final workspace in _collaborationViewModels) {
       workspace.dispose();
     }
+    _recentProjectService.removeListener(_onRecentsChanged);
+    _pinnedProjectService.removeListener(_onPinnedChanged);
     super.dispose();
   }
 }

@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:whisk/domain/models/recent_project.dart';
 import 'package:whisk/ui/core/ambient_glow_painter.dart';
+import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
@@ -10,19 +14,27 @@ class DashboardScreen extends StatefulWidget {
     required this.recentProjects,
     required this.onOpenDraftWorkspace,
     required this.onOpenProject,
+    required this.onOpenRecentProject,
+    required this.onRemoveRecentProject,
     required this.onOpenLocalCollaboration,
     required this.onJoinSharedWorkspace,
     this.activeWorkspaceTitle,
     this.onResumeActiveWorkspace,
+    this.pinnedProjects = const [],
+    this.onTogglePin,
   });
 
   final List<RecentProject> recentProjects;
   final ValueChanged<int> onOpenDraftWorkspace;
   final VoidCallback onOpenProject;
+  final ValueChanged<RecentProject> onOpenRecentProject;
+  final ValueChanged<String> onRemoveRecentProject;
   final VoidCallback onOpenLocalCollaboration;
   final Future<bool> Function(String invite) onJoinSharedWorkspace;
   final String? activeWorkspaceTitle;
   final VoidCallback? onResumeActiveWorkspace;
+  final List<String> pinnedProjects;
+  final ValueChanged<String>? onTogglePin;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -60,8 +72,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: AnimatedBuilder(
                     animation: _glowController,
                     builder: (context, _) {
-                          return CustomPaint(
-                            painter: AmbientGlowPainter(
+                      return CustomPaint(
+                        painter: AmbientGlowPainter(
                           animationValue: _glowController.value,
                         ),
                       );
@@ -72,7 +84,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             Row(
               children: [
-                const WorkspaceRail(),
+                WorkspaceRail(
+                  activeProjectTitle: widget.activeWorkspaceTitle,
+                  pinnedProjects: widget.pinnedProjects,
+                  onTogglePin: widget.onTogglePin,
+                  onSelectProject: widget.onResumeActiveWorkspace != null
+                      ? (_) => widget.onResumeActiveWorkspace!()
+                      : null,
+                ),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -100,29 +119,52 @@ class _NavbarFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 56,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          color: const Color(0xFF181818),
-          child: Center(
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.5,
-              child: const TextField(
-                style: TextStyle(color: kTextPrimary, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Buscar...',
-                  hintStyle: TextStyle(color: kTextMuted),
-                  prefixIcon:
-                      Icon(Icons.search, color: kTextMuted, size: 20),
+      height: 52,
+      child: GlassPanel(
+        borderRadius: 16,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Icon(Icons.search_rounded, color: kTextMuted, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'Buscar proyectos, comandos...',
+                  hintStyle: TextStyle(
+                    color: kTextMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
                   border: InputBorder.none,
-                  filled: true,
-                  fillColor: Color(0xFF22262E),
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
             ),
-          ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: kGlassHighlight,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: kBorder),
+              ),
+              child: const Text(
+                '\u2318K',
+                style: TextStyle(
+                  color: kTextMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -138,46 +180,42 @@ class _ContentFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        color: const Color(0xFF181818),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _SectionLabel('Nuevo'),
-                    const SizedBox(height: 12),
-                    _NewProjectGrid(
-                      onOpenDraftWorkspace:
-                          dashboard.widget.onOpenDraftWorkspace,
-                      onOpenProject:
-                          dashboard.widget.onOpenProject,
-                    ),
-                    const SizedBox(height: 32),
-                    const _SectionLabel('Recientes'),
-                    const SizedBox(height: 12),
-                    _RecentProjectsGrid(
-                      projects: dashboard.widget.recentProjects,
-                    ),
-                  ],
-                ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SectionLabel('Nuevo'),
+                  const SizedBox(height: 12),
+                  _NewProjectGrid(
+                    onOpenDraftWorkspace: dashboard.widget.onOpenDraftWorkspace,
+                    onOpenProject: dashboard.widget.onOpenProject,
+                  ),
+                  const SizedBox(height: 32),
+                  const _SectionLabel('Recientes'),
+                  const SizedBox(height: 12),
+                  _RecentProjectsGrid(
+                    projects: dashboard.widget.recentProjects,
+                    onOpenRecentProject: dashboard.widget.onOpenRecentProject,
+                    onRemoveRecentProject: dashboard.widget.onRemoveRecentProject,
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              SizedBox(
-                width: 260,
-                child: _CollaborationPanel(
-                  recentProjects: dashboard.widget.recentProjects,
-                  onJoinSharedWorkspace:
-                      dashboard.widget.onJoinSharedWorkspace,
-                ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 260,
+              child: _CollaborationPanel(
+                recentProjects: dashboard.widget.recentProjects,
+                onJoinSharedWorkspace: dashboard.widget.onJoinSharedWorkspace,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -353,9 +391,15 @@ class _ProjectCardState extends State<_ProjectCard>
 }
 
 class _RecentProjectsGrid extends StatelessWidget {
-  const _RecentProjectsGrid({required this.projects});
+  const _RecentProjectsGrid({
+    required this.projects,
+    required this.onOpenRecentProject,
+    required this.onRemoveRecentProject,
+  });
 
   final List<RecentProject> projects;
+  final ValueChanged<RecentProject> onOpenRecentProject;
+  final ValueChanged<String> onRemoveRecentProject;
 
   @override
   Widget build(BuildContext context) {
@@ -380,56 +424,141 @@ class _RecentProjectsGrid extends StatelessWidget {
       runSpacing: 12,
       children: [
         for (final project in projects)
-          _RecentProjectCard(project: project),
+          _RecentProjectCard(
+            project: project,
+            onTap: () => onOpenRecentProject(project),
+            onRemove: () => onRemoveRecentProject(project.path),
+          ),
       ],
     );
   }
 }
 
 class _RecentProjectCard extends StatelessWidget {
-  const _RecentProjectCard({required this.project});
+  const _RecentProjectCard({
+    required this.project,
+    required this.onTap,
+    required this.onRemove,
+  });
 
   final RecentProject project;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+
+  static const _cardWidth = 150.0;
+  static const _cardHeight = 210.0;
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorForType(project.type);
-    final icon = _iconForType(project.type);
+    final renderPath = _renderPdfPath();
+    if (renderPath != null) {
+      return _buildPdfPreview(context, renderPath);
+    }
+    return _buildFallback(context);
+  }
+
+  Widget _buildPdfPreview(BuildContext context, String path) {
     return SizedBox(
-      width: 160,
-      height: 100,
+      width: _cardWidth,
+      height: _cardHeight,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                PdfDocumentViewBuilder.file(
+                  path,
+                  loadingBuilder: (_) => _buildFallback(context),
+                  builder: (context, document) {
+                    if (document == null) return _buildFallback(context);
+                    return PdfPageView(
+                      document: document,
+                      pageNumber: 1,
+                      maximumDpi: 72,
+                      alignment: Alignment.topCenter,
+                      backgroundColor: kAppBlack,
+                      decoration: const BoxDecoration(),
+                    );
+                  },
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          kAppBlack.withValues(alpha: 0.85),
+                          kAppBlack.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                    child: Text(
+                      project.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: kTextPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallback(BuildContext context) {
+    final color = _colorForType(project.type);
+    final icon = _iconForType(project.type);
+    return SizedBox(
+      width: _cardWidth,
+      height: _cardHeight,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
           child: Container(
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(icon, color: color, size: 18),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        project.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: kTextPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                Icon(icon, color: color, size: 24),
                 const Spacer(),
+                Text(
+                  project.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: kTextPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Text(
                   project.type,
                   style: TextStyle(color: color, fontSize: 11),
@@ -442,19 +571,78 @@ class _RecentProjectCard extends StatelessWidget {
     );
   }
 
+  void _showContextMenu(BuildContext context, Offset position) {
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx, position.dy, position.dx + 1, position.dy + 1,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: kBorder),
+      ),
+      color: const Color(0xFF22262E),
+      items: [
+        PopupMenuItem(
+          value: 'open',
+          height: 36,
+          child: Row(
+            children: [
+              const Icon(Icons.open_in_new, size: 16, color: kTextSecondary),
+              const SizedBox(width: 8),
+              const Text('Open', style: TextStyle(color: kTextPrimary, fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'remove',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.close, size: 16, color: kDangerRed),
+              const SizedBox(width: 8),
+              Text('Remove', style: TextStyle(color: kDangerRed, fontSize: 13)),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'open') onTap();
+      if (value == 'remove') onRemove();
+    });
+  }
+
+  String? _renderPdfPath() {
+    final type = project.type;
+    if (type == 'folder') {
+      for (final env in ['latex', 'typst']) {
+        final candidate = '${project.path}${Platform.pathSeparator}.whisk'
+            '${Platform.pathSeparator}build${Platform.pathSeparator}$env'
+            '${Platform.pathSeparator}output.pdf';
+        if (File(candidate).existsSync()) return candidate;
+      }
+      return null;
+    }
+    final candidate = '${project.path}${Platform.pathSeparator}.whisk'
+        '${Platform.pathSeparator}build${Platform.pathSeparator}$type'
+        '${Platform.pathSeparator}output.pdf';
+    if (File(candidate).existsSync()) return candidate;
+    return null;
+  }
+
   Color _colorForType(String type) => switch (type) {
-        'latex' => kAccentBlue,
-        'typst' => kSuccessGreen,
-        'mermaid' => kAccentAmber,
-        _ => const Color(0xFF5A6570),
-      };
+    'latex' => kAccentBlue,
+    'typst' => kSuccessGreen,
+    'mermaid' => kAccentAmber,
+    _ => const Color(0xFF5A6570),
+  };
 
   IconData _iconForType(String type) => switch (type) {
-        'latex' => Icons.functions,
-        'typst' => Icons.description_outlined,
-        'mermaid' => Icons.account_tree_outlined,
-        _ => Icons.folder_outlined,
-      };
+    'latex' => Icons.functions,
+    'typst' => Icons.description_outlined,
+    'mermaid' => Icons.account_tree_outlined,
+    _ => Icons.folder_outlined,
+  };
 }
 
 class _CollaborationPanel extends StatelessWidget {
@@ -506,9 +694,8 @@ class _CollaborationPanel extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (context) => _PickRecentForSharingDialog(
-        projects: recentProjects,
-      ),
+      builder: (context) =>
+          _PickRecentForSharingDialog(projects: recentProjects),
     );
   }
 
@@ -620,18 +807,18 @@ class _PickRecentForSharingDialog extends StatelessWidget {
   }
 
   Color _colorForType(String type) => switch (type) {
-        'latex' => kAccentBlue,
-        'typst' => kSuccessGreen,
-        'mermaid' => kAccentAmber,
-        _ => const Color(0xFF5A6570),
-      };
+    'latex' => kAccentBlue,
+    'typst' => kSuccessGreen,
+    'mermaid' => kAccentAmber,
+    _ => const Color(0xFF5A6570),
+  };
 
   IconData _iconForType(String type) => switch (type) {
-        'latex' => Icons.functions,
-        'typst' => Icons.description_outlined,
-        'mermaid' => Icons.account_tree_outlined,
-        _ => Icons.folder_outlined,
-      };
+    'latex' => Icons.functions,
+    'typst' => Icons.description_outlined,
+    'mermaid' => Icons.account_tree_outlined,
+    _ => Icons.folder_outlined,
+  };
 }
 
 class _JoinSharedWorkspaceDialog extends StatefulWidget {
