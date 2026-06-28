@@ -24,8 +24,6 @@ class EditorContentFrame extends StatefulWidget {
     required this.onToggleFind,
     required this.onRefreshFind,
     required this.onMoveFind,
-    required this.onCreateInvite,
-    required this.onJoinInvite,
   });
 
   final WorkspaceViewModel viewModel;
@@ -42,8 +40,6 @@ class EditorContentFrame extends StatefulWidget {
   final VoidCallback onToggleFind;
   final VoidCallback onRefreshFind;
   final void Function(int) onMoveFind;
-  final VoidCallback? onCreateInvite;
-  final VoidCallback? onJoinInvite;
 
   @override
   State<EditorContentFrame> createState() => _EditorContentFrameState();
@@ -74,6 +70,7 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
                         environment: vm.selectedEnvironment,
                         onOpenFile: vm.openFile,
                         onNewFile: vm.createFile,
+                        onNewFolder: vm.createFolder,
                         onDeleteFile: vm.deleteFile,
                       ),
                     ),
@@ -92,8 +89,6 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
                       file: vm.activeFile,
                       openFiles: vm.openFiles,
                       onSelectFile: vm.openFile,
-                      onCreateInvite: widget.onCreateInvite,
-                      onJoinInvite: widget.onJoinInvite,
                     ),
                     Container(height: 1, color: kBorder),
                     Expanded(

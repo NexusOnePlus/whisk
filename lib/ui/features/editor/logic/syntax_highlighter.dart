@@ -89,6 +89,10 @@ const _headingStyle = TextStyle(
   fontWeight: FontWeight.w800,
 );
 
+const _typstCommandStyle = TextStyle(color: Color(0xFF5FD9B2));
+const _typstStringStyle = TextStyle(color: Color(0xFF7AE0B8));
+const _typstMathStyle = TextStyle(color: Color(0xFFFFB347));
+
 final _latexRules = [
   _HighlightRule(RegExp(r'%.*$', multiLine: true), _commentStyle),
   _HighlightRule(RegExp(r'\\[a-zA-Z@]+(\*?)'), _commandStyle),
@@ -100,9 +104,9 @@ final _latexRules = [
 final _typstRules = [
   _HighlightRule(RegExp(r'//.*$', multiLine: true), _commentStyle),
   _HighlightRule(RegExp(r'^=+ .+$', multiLine: true), _headingStyle),
-  _HighlightRule(RegExp(r'#\w+'), _commandStyle),
-  _HighlightRule(RegExp(r'"[^"\n]*"'), _stringStyle),
-  _HighlightRule(RegExp(r'\$[^$\n]+\$'), _mathStyle),
+  _HighlightRule(RegExp(r'#\w+'), _typstCommandStyle),
+  _HighlightRule(RegExp(r'"[^"\n]*"'), _typstStringStyle),
+  _HighlightRule(RegExp(r'\$[^$\n]+\$'), _typstMathStyle),
 ];
 
 final _mermaidRules = [

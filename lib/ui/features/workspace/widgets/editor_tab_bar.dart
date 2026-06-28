@@ -8,15 +8,11 @@ class EditorTabBar extends StatelessWidget {
     required this.file,
     required this.openFiles,
     required this.onSelectFile,
-    this.onCreateInvite,
-    this.onJoinInvite,
   });
 
   final WhiskFile file;
   final List<WhiskFile> openFiles;
   final ValueChanged<WhiskFile> onSelectFile;
-  final VoidCallback? onCreateInvite;
-  final VoidCallback? onJoinInvite;
 
   @override
   Widget build(BuildContext context) {
@@ -26,44 +22,21 @@ class EditorTabBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: kBorder)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: openFiles.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 4),
-              itemBuilder: (context, index) {
-                final tabFile = openFiles[index];
-                final active = tabFile.path == file.path;
-                return FileTabPill(
-                  icon: _iconFor(tabFile),
-                  label: tabFile.isDirty ? '${tabFile.name} *' : tabFile.name,
-                  active: active,
-                  accent: active ? kAccentBlue : null,
-                  onTap: () => onSelectFile(tabFile),
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'Create collaboration invite',
-            onPressed: onCreateInvite,
-            icon: const Icon(Icons.ios_share, size: 18),
-            color: kTextSecondary,
-            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-            padding: EdgeInsets.zero,
-          ),
-          IconButton(
-            tooltip: 'Join collaboration invite',
-            onPressed: onJoinInvite,
-            icon: const Icon(Icons.link, size: 18),
-            color: kTextSecondary,
-            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-            padding: EdgeInsets.zero,
-          ),
-        ],
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: openFiles.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 4),
+        itemBuilder: (context, index) {
+          final tabFile = openFiles[index];
+          final active = tabFile.path == file.path;
+          return FileTabPill(
+            icon: _iconFor(tabFile),
+            label: tabFile.isDirty ? '${tabFile.name} *' : tabFile.name,
+            active: active,
+            accent: active ? kAccentBlue : null,
+            onTap: () => onSelectFile(tabFile),
+          );
+        },
       ),
     );
   }

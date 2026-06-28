@@ -26,15 +26,15 @@ class FindBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 42,
-      padding: const EdgeInsets.fromLTRB(14, 4, 16, 6),
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: kBorder)),
       ),
       child: Row(
         children: [
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
+            constraints: const BoxConstraints(maxWidth: 340),
             child: TextField(
               controller: controller,
               focusNode: focusNode,
@@ -47,66 +47,91 @@ class FindBar extends StatelessWidget {
                   horizontal: 12,
                   vertical: 8,
                 ),
-                prefixIcon: const Icon(Icons.search, size: 16),
+                prefixIcon: const Icon(Icons.search_rounded, size: 16),
                 prefixIconConstraints: const BoxConstraints(
                   minWidth: 34,
                   minHeight: 28,
                 ),
-                hintText: 'Find in file',
+                hintText: 'Buscar en archivo...',
                 hintStyle: const TextStyle(color: kTextMuted, fontSize: 12),
                 filled: true,
-                fillColor: const Color(0xFF22262E),
+                fillColor: const Color(0xFF1C2028),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(color: kBorder),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(color: kBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(color: kAccentBlue),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            '$currentMatch / $matchCount',
-            style: const TextStyle(color: kTextMuted, fontSize: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: kGlassHighlight,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '$currentMatch / $matchCount',
+              style: const TextStyle(
+                color: kTextMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-          const SizedBox(width: 6),
-          IconButton(
+          const SizedBox(width: 4),
+          _FindIconButton(
             tooltip: 'Previous match',
             onPressed: onPrevious,
-            icon: const Icon(Icons.keyboard_arrow_up),
-            color: kTextSecondary,
-            iconSize: 18,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            padding: EdgeInsets.zero,
+            icon: Icons.keyboard_arrow_up,
           ),
-          IconButton(
+          _FindIconButton(
             tooltip: 'Next match',
             onPressed: onNext,
-            icon: const Icon(Icons.keyboard_arrow_down),
-            color: kTextSecondary,
-            iconSize: 18,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            padding: EdgeInsets.zero,
+            icon: Icons.keyboard_arrow_down,
           ),
           const Spacer(),
-          IconButton(
+          _FindIconButton(
             tooltip: 'Close find',
             onPressed: onClose,
-            icon: const Icon(Icons.close),
-            color: kTextSecondary,
-            iconSize: 17,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            padding: EdgeInsets.zero,
+            icon: Icons.close,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FindIconButton extends StatelessWidget {
+  const _FindIconButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.icon,
+  });
+
+  final String tooltip;
+  final VoidCallback onPressed;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      color: kTextSecondary,
+      hoverColor: kGlassHighlight,
+      splashRadius: 14,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      padding: EdgeInsets.zero,
     );
   }
 }

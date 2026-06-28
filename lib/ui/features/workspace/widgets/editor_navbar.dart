@@ -1,52 +1,189 @@
 import 'package:flutter/material.dart';
+import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 class EditorNavbar extends StatelessWidget {
-  const EditorNavbar({super.key, required this.onCloseWorkspace});
+  const EditorNavbar({
+    super.key,
+    required this.onCloseWorkspace,
+    this.onCreateInvite,
+    this.onJoinInvite,
+    this.onImportFile,
+  });
 
   final VoidCallback onCloseWorkspace;
+  final VoidCallback? onCreateInvite;
+  final VoidCallback? onJoinInvite;
+  final VoidCallback? onImportFile;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 56,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          color: const Color(0xFF181818),
-          child: Row(
-            children: [
-              const SizedBox(width: 12),
-              IconButton(
-                tooltip: 'Back to dashboard',
-                onPressed: onCloseWorkspace,
-                icon: const Icon(Icons.arrow_back, color: kTextSecondary, size: 22),
-              ),
-              Expanded(
-                child: Center(
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.5,
-                    child: const TextField(
-                      style: TextStyle(color: kTextPrimary, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: 'Buscar...',
-                        hintStyle: TextStyle(color: kTextMuted),
-                        prefixIcon:
-                            Icon(Icons.search, color: kTextMuted, size: 20),
-                        border: InputBorder.none,
-                        filled: true,
-                        fillColor: Color(0xFF22262E),
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+      height: 52,
+      child: GlassPanel(
+        borderRadius: 16,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: 'Back to dashboard',
+              onPressed: onCloseWorkspace,
+              icon: const Icon(Icons.arrow_back_rounded, color: kTextSecondary, size: 20),
+            ),
+            _NavBarDropdown(
+              label: 'File',
+              items: [
+                _NavBarMenuItem(
+                  icon: Icons.file_open_outlined,
+                  label: 'Import file',
+                  onTap: onImportFile,
+                ),
+              ],
+            ),
+            _NavBarDropdown(
+              label: 'About',
+              items: [
+                _NavBarMenuItem(
+                  icon: Icons.info_outline,
+                  label: 'About Whisk',
+                  onTap: () {},
+                ),
+              ],
+            ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.center,
+                child: FractionallySizedBox(
+                  widthFactor: 0.5,
+                  child: Row(
+                    children: [
+                      Icon(Icons.search_rounded, color: kTextMuted, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          style: const TextStyle(
+                            color: kTextPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'Buscar en el workspace...',
+                            hintStyle: TextStyle(
+                              color: kTextMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kGlassHighlight,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: const Text(
+                          '\u2318K',
+                          style: TextStyle(
+                            color: kTextMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-            ],
-          ),
+            ),
+            IconButton(
+              tooltip: 'Create collaboration invite',
+              onPressed: onCreateInvite,
+              icon: const Icon(Icons.ios_share, size: 18),
+              color: kTextSecondary,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+            ),
+            IconButton(
+              tooltip: 'Join collaboration invite',
+              onPressed: onJoinInvite,
+              icon: const Icon(Icons.link, size: 18),
+              color: kTextSecondary,
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _NavBarDropdown extends StatelessWidget {
+  const _NavBarDropdown({required this.label, required this.items});
+
+  final String label;
+  final List<_NavBarMenuItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_NavBarMenuItem>(
+      onSelected: (item) => item.onTap?.call(),
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: kBorder),
+      ),
+      color: const Color(0xFF22262E),
+      itemBuilder: (context) => items
+          .map(
+            (item) => PopupMenuItem<_NavBarMenuItem>(
+              value: item,
+              height: 36,
+              child: Row(
+                children: [
+                  Icon(item.icon, size: 16, color: kTextSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    item.label,
+                    style: const TextStyle(color: kTextPrimary, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: kTextSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Icons.expand_more, size: 16, color: kTextMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavBarMenuItem {
+  const _NavBarMenuItem({required this.icon, required this.label, this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
 }
