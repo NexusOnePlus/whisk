@@ -128,7 +128,12 @@ class _FilesSectionState extends State<_FilesSection> {
   @override
   Widget build(BuildContext context) {
     final root = widget.files.isNotEmpty ? widget.files.first.projectRoot : null;
-    final topFolders = widget.files.where((f) => f.isDirectory).toList();
+    final topFolders = widget.files.where((f) {
+      if (!f.isDirectory) return false;
+      if (root == null) return true;
+      final relative = f.path.substring(root.length).replaceFirst(RegExp(r'^[\\/]'), '');
+      return !relative.contains(Platform.pathSeparator);
+    }).toList();
     final rootFiles = widget.files.where((f) => !f.isDirectory).where((f) {
       if (root == null) return true;
       final relative = f.path.substring(root.length).replaceFirst(RegExp(r'^[\\/]'), '');
@@ -208,20 +213,41 @@ class _FilesSectionState extends State<_FilesSection> {
             onAddFolder: () => _handleNewFolderInFolder(context, folder),
           ),
           if (_expandedFolders.contains(folder.path))
-            for (final child in widget.files.where((f) =>
-                !f.isDirectory && f.path.startsWith(folder.path + Platform.pathSeparator)))
+            for (final child in widget.files.where((f) {
+              if (!f.path.startsWith(folder.path + Platform.pathSeparator)) return false;
+              final relative = f.path.substring(folder.path.length + 1);
+              return !relative.contains(Platform.pathSeparator);
+            }))
               Padding(
                 padding: const EdgeInsets.only(left: 24),
-                child: _FileRow(
-                  icon: _iconFor(child),
-                  label: child.name,
-                  detail: '',
-                  selected: widget.file.path == child.path,
-                  onTap: () => widget.onOpenFile(child),
-                  onDelete: widget.file.projectRoot != null
-                      ? () => _handleDeleteFile(context, child)
-                      : null,
-                ),
+                child: child.isDirectory
+                    ? _FolderRow(
+                        folder: child,
+                        expanded: _expandedFolders.contains(child.path),
+                        selected: widget.file.path == child.path,
+                        onToggle: () => setState(() {
+                          if (_expandedFolders.contains(child.path)) {
+                            _expandedFolders.remove(child.path);
+                          } else {
+                            _expandedFolders.add(child.path);
+                          }
+                        }),
+                        onDelete: widget.file.projectRoot != null
+                            ? () => _handleDeleteFile(context, child)
+                            : null,
+                        onAddFile: () => _handleNewFileInFolder(context, child),
+                        onAddFolder: () => _handleNewFolderInFolder(context, child),
+                      )
+                    : _FileRow(
+                        icon: _iconFor(child),
+                        label: child.name,
+                        detail: '',
+                        selected: widget.file.path == child.path,
+                        onTap: () => widget.onOpenFile(child),
+                        onDelete: widget.file.projectRoot != null
+                            ? () => _handleDeleteFile(context, child)
+                            : null,
+                      ),
               ),
         ],
         for (final projectFile in rootFiles)
