@@ -16,6 +16,8 @@ import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 
+// ignore_for_file: unawaited_futures
+
 class WorkspaceViewModel extends ChangeNotifier {
   WorkspaceViewModel({
     EnvironmentCatalog catalog = const EnvironmentCatalog(),
@@ -40,6 +42,9 @@ class WorkspaceViewModel extends ChangeNotifier {
     _initWatcher();
     _initCollaboration();
     _publishWorkspaceManifest();
+    if (_isInlineEnv) {
+      _renderResult = RenderResult.success(content: _activeFile.content);
+    }
   }
 
   final CollaborationService? collaborationService;
@@ -59,6 +64,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   late List<WhiskFile> _openFiles;
   int _selectedEnvironmentIndex = 0;
   RenderResult _renderResult = const RenderResult.idle();
+  final Map<String, RenderResult> _renderResultCache = {};
   var _disposed = false;
 
   List<EnvironmentKind> get environments => List.unmodifiable(_environments);
@@ -69,6 +75,11 @@ class WorkspaceViewModel extends ChangeNotifier {
       _environments[_selectedEnvironmentIndex];
   WhiskFile get activeFile => _activeFile;
   RenderResult get renderResult => _renderResult;
+
+  bool get _isInlineEnv {
+    final id = selectedEnvironment.id;
+    return id == 'notes' || id == 'mermaid';
+  }
   List<CollaborationPeer> get collaborationPeers =>
       List.unmodifiable(_collaborationPeers);
   Stream<CollaborationTextUpdate>? get remoteTextUpdates =>
@@ -79,11 +90,18 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (index == _selectedEnvironmentIndex) return;
     if (index < 0 || index >= _environments.length) return;
 
+    _renderResultCache[_activeFile.path] = _renderResult;
+
     _selectedEnvironmentIndex = index;
     _activeFile = _fileForEnvironment(_environments[index]);
     _projectFiles = [_activeFile];
     _openFiles = [_activeFile];
-    _renderResult = const RenderResult.idle();
+    if (_isInlineEnv) {
+      _renderResult = RenderResult.success(content: _activeFile.content);
+    } else {
+      _renderResult = _renderResultCache[_activeFile.path] ??
+          const RenderResult.idle();
+    }
     notifyListeners();
   }
 
@@ -92,13 +110,30 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (content == _activeFile.content) return;
     _activeFile = _activeFile.copyWith(content: content, isDirty: true);
     _replaceFileInLists(_activeFile);
+    _renderResultCache.remove(_activeFile.path);
+    final envId = selectedEnvironment.id;
+    if (envId == 'notes' || envId == 'mermaid') {
+      _renderResult = RenderResult.success(content: content);
+    }
     notifyListeners();
+  }
+
+  static int _envIndexForExtension(String ext) {
+    return switch (ext) {
+      '.tex' => 0,
+      '.typ' => 1,
+      '.mmd' => 2,
+      '.md' => 3,
+      _ => -1,
+    };
   }
 
   Future<void> openFile(WhiskFile file) async {
     if (_disposed) return;
     await saveActiveFile();
     if (_disposed) return;
+
+    _renderResultCache[_activeFile.path] = _renderResult;
 
     var next = file;
     if (next.content.isEmpty &&
@@ -111,6 +146,11 @@ class WorkspaceViewModel extends ChangeNotifier {
       }
     }
 
+    final envIndex = _envIndexForExtension(next.extension);
+    if (envIndex >= 0) {
+      _selectedEnvironmentIndex = envIndex;
+    }
+
     _activeFile = next;
     if (!_openFiles.any((file) => file.path == next.path)) {
       _openFiles = [..._openFiles, next];
@@ -120,7 +160,12 @@ class WorkspaceViewModel extends ChangeNotifier {
           .toList(growable: false);
     }
     _replaceFileInLists(next);
-    _renderResult = const RenderResult.idle();
+    if (_isInlineEnv) {
+      _renderResult = RenderResult.success(content: next.content);
+    } else {
+      _renderResult = _renderResultCache[next.path] ??
+          const RenderResult.idle();
+    }
     _syncActiveFileSnapshot();
     notifyListeners();
   }
@@ -128,6 +173,13 @@ class WorkspaceViewModel extends ChangeNotifier {
   Future<void> renderActiveFile() async {
     if (_disposed) return;
     if (_renderResult.isRendering) return;
+
+    final envId = selectedEnvironment.id;
+    if (envId == 'notes' || envId == 'mermaid') {
+      _renderResult = RenderResult.success(content: _activeFile.content);
+      notifyListeners();
+      return;
+    }
 
     _renderResult = const RenderResult.rendering();
     notifyListeners();
@@ -145,6 +197,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (selectedEnvironment.id != environmentId) return;
 
     _renderResult = result;
+    _renderResultCache[_activeFile.path] = result;
     notifyListeners();
   }
 
@@ -187,6 +240,10 @@ class WorkspaceViewModel extends ChangeNotifier {
     _watcherSubscription?.cancel();
     _peersSubscription?.cancel();
     _remoteFilesSubscription?.cancel();
+    final service = collaborationService;
+    if (service != null) {
+      service.disconnect();
+    }
     final guestDraftRoot = _guestDraftRoot;
     if (guestDraftRoot != null) {
       unawaited(_deleteGuestDraftRoot(guestDraftRoot));
@@ -237,22 +294,47 @@ class WorkspaceViewModel extends ChangeNotifier {
     final root = _activeFile.projectRoot;
     if (root == null) return;
 
-    final files = await _openService.listDirectoryFiles(root);
+    final entries = await _openService.listDirectoryEntries(root);
     if (_disposed) return;
 
-    _projectFiles = files
+    final folders = <WhiskFile>[];
+    for (final entity in entries) {
+      final name = entity.path.split(Platform.pathSeparator).last;
+      if (_isIgnoredFolder(name)) continue;
+      if (entity is Directory) {
+        folders.add(WhiskFile(
+          path: entity.path,
+          name: name,
+          extension: '',
+          content: '',
+          projectRoot: root,
+          isDirectory: true,
+        ));
+      }
+    }
+
+    final diskFiles = await _openService.listDirectoryFiles(root);
+    if (_disposed) return;
+
+    final files = diskFiles
         .map(
           (file) => WhiskFile(
             path: file.path,
-            name: file.uri.pathSegments.last,
+            name: file.path.split(Platform.pathSeparator).last,
             extension: _openService.extensionOf(file.path),
             content: file.path == _activeFile.path ? _activeFile.content : '',
             projectRoot: root,
           ),
         )
         .toList(growable: false);
+
+    _projectFiles = [...folders, ...files];
     _publishWorkspaceManifest();
     notifyListeners();
+  }
+
+  static bool _isIgnoredFolder(String name) {
+    return name == '.git' || name == '.whisk' || name == 'build';
   }
 
   Future<void> createFile(String fileName) async {
@@ -265,6 +347,19 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (await file.exists()) return;
 
     await file.create(recursive: true);
+    await _refreshProjectFiles();
+  }
+
+  Future<void> createFolder(String folderName) async {
+    if (_disposed) return;
+    final root = _activeFile.projectRoot;
+    if (root == null) return;
+
+    final path = '$root${Platform.pathSeparator}$folderName';
+    final dir = Directory(path);
+    if (await dir.exists()) return;
+
+    await dir.create(recursive: true);
     await _refreshProjectFiles();
   }
 
@@ -390,6 +485,10 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (content == _activeFile.content) return;
     _activeFile = _activeFile.copyWith(content: content, isDirty: true);
     _replaceFileInLists(_activeFile);
+    _renderResultCache.remove(_activeFile.path);
+    if (_isInlineEnv) {
+      _renderResult = RenderResult.success(content: content);
+    }
     notifyListeners();
   }
 

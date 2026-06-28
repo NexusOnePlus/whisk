@@ -19,10 +19,16 @@ class WorkspaceScreen extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.onCloseWorkspace,
+    this.pinnedProjects = const [],
+    this.onCloseProject,
+    this.onTogglePin,
   });
 
   final WorkspaceViewModel viewModel;
   final VoidCallback onCloseWorkspace;
+  final List<String> pinnedProjects;
+  final VoidCallback? onCloseProject;
+  final ValueChanged<String>? onTogglePin;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -69,7 +75,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       _handleRemoteTextUpdate,
     );
     _controller.addListener(_schedulePresenceSync);
-    viewModel.addListener(_syncControllerFromModel);
+    viewModel.addListener(_onViewModelChanged);
   }
 
   @override
@@ -80,7 +86,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     _presenceSyncTimer?.cancel();
     _operationSubscription?.cancel();
     _remoteTextSubscription?.cancel();
-    viewModel.removeListener(_syncControllerFromModel);
+    viewModel.removeListener(_onViewModelChanged);
     _controller.removeListener(_schedulePresenceSync);
     _controller.dispose();
     _editorFocusNode.dispose();
@@ -89,12 +95,22 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     super.dispose();
   }
 
-  void _syncControllerFromModel() {
+  String? _lastPreviewKey;
+
+  void _onViewModelChanged() {
+    if (!mounted) return;
     if (_pendingContent != null) return;
     final content = viewModel.activeFile.content;
     _controller.setEnvironment(viewModel.selectedEnvironment.id);
-    if (_controller.text == content) return;
-    _controller.setTextFromModel(content);
+    if (_controller.text != content) {
+      _controller.setTextFromModel(content);
+    }
+    final r = viewModel.renderResult;
+    final key = '${viewModel.activeFile.path}|${viewModel.selectedEnvironment.id}|${r.state}|${r.pdfPath}|${r.content}';
+    if (key != _lastPreviewKey) {
+      _lastPreviewKey = key;
+      setState(() {});
+    }
   }
 
   void _handleEditorChanged(String content) {
@@ -265,6 +281,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
         ): () async {
           _flushPendingContent();
           await viewModel.saveActiveFile();
+          viewModel.renderActiveFile();
         },
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             _toggleFind,
@@ -301,7 +318,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                     ),
                     Row(
                       children: [
-                        const WorkspaceRail(),
+                        WorkspaceRail(
+                          activeProjectTitle: viewModel.activeFile.projectRoot != null
+                              ? viewModel.activeFile.projectRoot!
+                                  .split(RegExp(r'[\\/]'))
+                                  .last
+                              : null,
+                          pinnedProjects: widget.pinnedProjects,
+                          onCloseProject: widget.onCloseProject,
+                          onTogglePin: widget.onTogglePin,
+                        ),
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.all(12),
@@ -309,6 +335,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                               children: [
                                 EditorNavbar(
                                   onCloseWorkspace: widget.onCloseWorkspace,
+                                  onCreateInvite: _createCollaborationInvite,
+                                  onJoinInvite: _joinCollaborationInvite,
                                 ),
                                 const SizedBox(height: 6),
                                 EditorContentFrame(
@@ -326,10 +354,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                                     onToggleFind: _toggleFind,
                                     onRefreshFind: _refreshFindMatches,
                                     onMoveFind: _moveFind,
-                                    onCreateInvite:
-                                        _createCollaborationInvite,
-                                    onJoinInvite:
-                                        _joinCollaborationInvite,
                                   ),
                               ],
                             ),
