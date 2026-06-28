@@ -6,15 +6,19 @@ class WorkspaceRail extends StatefulWidget {
   const WorkspaceRail({
     super.key,
     this.activeProjectTitle,
+    this.openProjects = const [],
     this.pinnedProjects = const [],
     this.onSelectProject,
+    this.onSwitchProject,
     this.onCloseProject,
     this.onTogglePin,
   });
 
   final String? activeProjectTitle;
+  final List<String> openProjects;
   final List<String> pinnedProjects;
   final void Function(int index)? onSelectProject;
+  final ValueChanged<String>? onSwitchProject;
   final VoidCallback? onCloseProject;
   final ValueChanged<String>? onTogglePin;
 
@@ -73,8 +77,20 @@ class _WorkspaceRailState extends State<WorkspaceRail> {
                     : null,
               ),
             ],
+            if (widget.openProjects.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              for (final path in widget.openProjects)
+                if (path.split(RegExp(r'[\\/]')).last != widget.activeProjectTitle)
+                  _PinnedProjectItem(
+                    title: path.split(RegExp(r'[\\/]')).last,
+                    onTap: widget.onSwitchProject != null
+                        ? () => widget.onSwitchProject!(path)
+                        : null,
+                    onUnpin: null,
+                  ),
+            ],
             if (widget.pinnedProjects.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               for (var i = 0; i < widget.pinnedProjects.length; i++)
                 if (widget.pinnedProjects[i] != widget.activeProjectTitle)
                   _PinnedProjectItem(

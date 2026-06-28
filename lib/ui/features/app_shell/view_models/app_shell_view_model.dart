@@ -45,6 +45,7 @@ class AppShellViewModel extends ChangeNotifier {
   AppShellMode _mode = AppShellMode.dashboard;
   WorkspaceViewModel? _workspaceViewModel;
   List<WorkspaceViewModel> _collaborationViewModels = const [];
+  final List<String> _openProjectPaths = [];
   var _localPeerSequence = 0;
   var _disposed = false;
 
@@ -61,6 +62,8 @@ class AppShellViewModel extends ChangeNotifier {
   List<WorkspaceViewModel> get collaborationViewModels =>
       List.unmodifiable(_collaborationViewModels);
 
+  List<String> get openProjectPaths => List.unmodifiable(_openProjectPaths);
+
   void openDraftWorkspace(int envIndex) {
     if (_disposed) return;
     final env = const EnvironmentCatalog().listEnvironments()[envIndex];
@@ -75,12 +78,23 @@ class AppShellViewModel extends ChangeNotifier {
       workspace.dispose();
     }
     _collaborationViewModels = const [];
+    _workspaceViewModel?.dispose();
     _workspaceViewModel = WorkspaceViewModel(
       startEnvIndex: envIndex,
       collaborationService: CollaborationServiceP2p(),
     );
+    _addOpenProject(rootPath);
     _mode = AppShellMode.workspace;
     notifyListeners();
+  }
+
+  void _addOpenProject(String path) {
+    _openProjectPaths.remove(path);
+    _openProjectPaths.add(path);
+  }
+
+  void _removeOpenProject(String path) {
+    _openProjectPaths.remove(path);
   }
 
   void openLocalCollaborationDemo() {
@@ -165,6 +179,7 @@ class AppShellViewModel extends ChangeNotifier {
       collaborationService: CollaborationServiceP2p(),
     );
     _workspaceViewModel = workspace;
+    _addOpenProject(rootPath);
     _mode = AppShellMode.workspace;
     notifyListeners();
 
@@ -241,6 +256,22 @@ class AppShellViewModel extends ChangeNotifier {
   void closeWorkspace() {
     if (_disposed) return;
     _saveCurrentWorkspaceState();
+    _workspaceViewModel?.dispose();
+    _workspaceViewModel = null;
+    _mode = AppShellMode.dashboard;
+    notifyListeners();
+  }
+
+  void closeAndRemoveWorkspace() {
+    if (_disposed) return;
+    _saveCurrentWorkspaceState();
+    final workspace = _workspaceViewModel;
+    if (workspace != null) {
+      final root = workspace.activeFile.projectRoot;
+      if (root != null) _removeOpenProject(root);
+    }
+    _workspaceViewModel?.dispose();
+    _workspaceViewModel = null;
     _mode = AppShellMode.dashboard;
     notifyListeners();
   }
@@ -300,6 +331,7 @@ class AppShellViewModel extends ChangeNotifier {
       collaborationService: CollaborationServiceP2p(),
     );
     _workspaceViewModel = workspace;
+    _addOpenProject(project.path);
     _mode = AppShellMode.workspace;
     notifyListeners();
 
@@ -308,6 +340,22 @@ class AppShellViewModel extends ChangeNotifier {
 
   void removeRecentProject(String path) {
     _recentProjectService.remove(path);
+  }
+
+  Future<void> switchToProject(String path) async {
+    if (_disposed) return;
+    if (_workspaceViewModel?.activeFile.projectRoot == path) return;
+
+    final existing = _recentProjectService.projects
+        .where((p) => p.path == path)
+        .firstOrNull;
+    final project = existing ?? RecentProject(
+      path: path,
+      name: path.split(Platform.pathSeparator).last,
+      type: 'folder',
+      lastOpened: DateTime.now().millisecondsSinceEpoch,
+    );
+    await openRecentProject(project);
   }
 
   WorkspaceViewModel _createLocalCollaborationWorkspace() {

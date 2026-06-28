@@ -43,13 +43,17 @@ class _AppShellState extends State<AppShell> {
             onResumeActiveWorkspace: viewModel.resumeActiveWorkspace,
             pinnedProjects: viewModel.pinnedProjects,
             onTogglePin: viewModel.togglePinProject,
+            openProjects: viewModel.openProjectPaths,
+            onSwitchProject: viewModel.switchToProject,
           ),
           AppShellMode.workspace => WorkspaceScreen(
             viewModel: viewModel.workspaceViewModel!,
             onCloseWorkspace: viewModel.closeWorkspace,
+            openProjects: viewModel.openProjectPaths,
             pinnedProjects: viewModel.pinnedProjects,
-            onCloseProject: viewModel.closeWorkspace,
+            onCloseProject: viewModel.closeAndRemoveWorkspace,
             onTogglePin: viewModel.togglePinProject,
+            onSwitchProject: viewModel.switchToProject,
           ),
           AppShellMode.localCollaboration => _LocalCollaborationWorkspace(
             viewModel: viewModel,
@@ -98,6 +102,7 @@ class _LocalCollaborationWorkspace extends StatelessWidget {
                         child: WorkspaceScreen(
                           viewModel: workspace,
                           onCloseWorkspace: viewModel.closeWorkspace,
+                          openProjects: viewModel.openProjectPaths,
                           pinnedProjects: viewModel.pinnedProjects,
                           onTogglePin: viewModel.togglePinProject,
                         ),

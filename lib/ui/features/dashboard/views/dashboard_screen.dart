@@ -22,6 +22,8 @@ class DashboardScreen extends StatefulWidget {
     this.onResumeActiveWorkspace,
     this.pinnedProjects = const [],
     this.onTogglePin,
+    this.openProjects = const [],
+    this.onSwitchProject,
   });
 
   final List<RecentProject> recentProjects;
@@ -35,6 +37,8 @@ class DashboardScreen extends StatefulWidget {
   final VoidCallback? onResumeActiveWorkspace;
   final List<String> pinnedProjects;
   final ValueChanged<String>? onTogglePin;
+  final List<String> openProjects;
+  final ValueChanged<String>? onSwitchProject;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -86,8 +90,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               children: [
                 WorkspaceRail(
                   activeProjectTitle: widget.activeWorkspaceTitle,
+                  openProjects: widget.openProjects,
                   pinnedProjects: widget.pinnedProjects,
                   onTogglePin: widget.onTogglePin,
+                  onSwitchProject: widget.onSwitchProject,
                   onSelectProject: widget.onResumeActiveWorkspace != null
                       ? (_) => widget.onResumeActiveWorkspace!()
                       : null,

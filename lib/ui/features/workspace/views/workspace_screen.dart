@@ -19,16 +19,20 @@ class WorkspaceScreen extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.onCloseWorkspace,
+    this.openProjects = const [],
     this.pinnedProjects = const [],
     this.onCloseProject,
     this.onTogglePin,
+    this.onSwitchProject,
   });
 
   final WorkspaceViewModel viewModel;
   final VoidCallback onCloseWorkspace;
+  final List<String> openProjects;
   final List<String> pinnedProjects;
   final VoidCallback? onCloseProject;
   final ValueChanged<String>? onTogglePin;
+  final ValueChanged<String>? onSwitchProject;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -76,6 +80,19 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     );
     _controller.addListener(_schedulePresenceSync);
     viewModel.addListener(_onViewModelChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkspaceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.viewModel, oldWidget.viewModel)) {
+      oldWidget.viewModel.removeListener(_onViewModelChanged);
+      widget.viewModel.addListener(_onViewModelChanged);
+      _controller.setTextFromModel(viewModel.activeFile.content);
+      _controller.setEnvironment(viewModel.selectedEnvironment.id);
+      _lastPreviewKey = null;
+      setState(() {});
+    }
   }
 
   @override
@@ -324,9 +341,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                                   .split(RegExp(r'[\\/]'))
                                   .last
                               : null,
+                          openProjects: widget.openProjects,
                           pinnedProjects: widget.pinnedProjects,
                           onCloseProject: widget.onCloseProject,
                           onTogglePin: widget.onTogglePin,
+                          onSwitchProject: widget.onSwitchProject,
                         ),
                         Expanded(
                           child: Padding(
