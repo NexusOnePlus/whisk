@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart'
+    hide MarkdownStyleSheet;
 import 'package:pdfrx/pdfrx.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/render_result.dart';
+import 'package:whisk/ui/core/math_markdown_extension.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 class PreviewPane extends StatelessWidget {
@@ -18,6 +22,64 @@ class PreviewPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final envId = environment.id;
+    if (envId == 'notes') {
+      return _buildMarkdownPreview(context, result.content);
+    }
+    if (envId == 'mermaid') {
+      return _buildMermaidPreview(result.content);
+    }
+    return _buildPdfViewer();
+  }
+
+  Widget _buildMarkdownPreview(BuildContext context, String? content) {
+    if (content == null || content.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      color: kAppBlack,
+      child: Markdown(
+        key: ValueKey(content.hashCode),
+        data: content,
+        selectable: true,
+        padding: const EdgeInsets.all(24),
+        blockSyntaxes: [BlockMathSyntax()],
+        inlineSyntaxes: [InlineMathSyntax()],
+        builders: {
+          'math_block': MathBlockBuilder(),
+          'math_inline': MathInlineBuilder(),
+        },
+        styleSheet: MarkdownStyleSheet.fromTheme(
+          Theme.of(context).copyWith(
+            textTheme: Theme.of(context).textTheme.apply(
+              bodyColor: Colors.white,
+              decorationColor: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMermaidPreview(String? content) {
+    if (content == null || content.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      color: kAppBlack,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: MermaidDiagram(
+            code: content,
+            style: MermaidStyle.dark(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPdfViewer() {
     return Container(
       color: kAppBlack,
       child: switch (result.state) {
@@ -33,9 +95,25 @@ class PreviewPane extends StatelessWidget {
           key: ValueKey(result.pdfPath),
         ),
         RenderState.failed => Center(
-          child: Text('Render failed', style: TextStyle(color: kDangerRed)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Render failed', style: TextStyle(color: kDangerRed)),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: onRender,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
-        _ => const SizedBox.shrink(),
+        _ => Center(
+          child: TextButton.icon(
+            onPressed: onRender,
+            icon: const Icon(Icons.play_arrow, size: 20),
+            label: const Text('Render'),
+          ),
+        ),
       },
     );
   }
