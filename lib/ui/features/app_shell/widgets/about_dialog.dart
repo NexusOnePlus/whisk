@@ -5,14 +5,14 @@ import 'package:whisk/data/services/update_service.dart';
 import 'package:whisk/data/services/updater_config.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
-class AboutDialog extends StatefulWidget {
-  const AboutDialog({super.key});
+class WhiskAboutDialog extends StatefulWidget {
+  const WhiskAboutDialog({super.key});
 
   @override
-  State<AboutDialog> createState() => _AboutDialogState();
+  State<WhiskAboutDialog> createState() => _WhiskAboutDialogState();
 }
 
-class _AboutDialogState extends State<AboutDialog> {
+class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
   String _version = '...';
   UpdateInfo? _updateInfo;
   bool _checking = false;
