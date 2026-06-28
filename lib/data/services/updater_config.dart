@@ -20,7 +20,7 @@ class UpdaterConfig {
   static Future<UpdaterConfig> load() async {
     if (kIsWeb) {
       return const UpdaterConfig(
-        repoOwner: 'YOUR_USERNAME',
+        repoOwner: 'NexusOnePlus',
         repoName: 'whisk',
         checkOnStartup: true,
         showReleaseNotes: true,
@@ -35,7 +35,7 @@ class UpdaterConfig {
         final app = yaml['app'] as Map? ?? {};
         final updater = yaml['updater'] as Map? ?? {};
         return UpdaterConfig(
-          repoOwner: app['repo_owner'] ?? 'YOUR_USERNAME',
+          repoOwner: app['repo_owner'] ?? 'NexusOnePlus',
           repoName: app['repo_name'] ?? 'whisk',
           checkOnStartup: updater['check_on_startup'] ?? true,
           showReleaseNotes: updater['show_release_notes'] ?? true,
@@ -44,7 +44,7 @@ class UpdaterConfig {
     } catch (_) {}
 
     return const UpdaterConfig(
-      repoOwner: 'YOUR_USERNAME',
+      repoOwner: 'NexusOnePlus',
       repoName: 'whisk',
       checkOnStartup: true,
       showReleaseNotes: true,

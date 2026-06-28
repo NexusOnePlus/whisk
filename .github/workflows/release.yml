@@ -1,9 +1,8 @@
-name: Build Windows Installer
+name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
 
 permissions:
   contents: write
@@ -18,18 +17,25 @@ jobs:
         with:
           channel: stable
 
-      - run: flutter pub get
+      - run: dart pub global activate cider
+      - run: dart pub get
 
-      - name: Extract version from tag
-        id: version
+      - name: Auto bump patch version
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          $version = $tag -replace '^v', ''
+          dart run cider bump patch
+          $content = Get-Content pubspec.yaml -Raw
+          $match = [regex]::Match($content, 'version:\s+(\S+)')
+          $fullVersion = $match.Groups[1].Value
+          $parts = $fullVersion -split '\+'
+          $version = $parts[0]
+          $buildNumber = if ($parts.Length -gt 1) { $parts[1] } else { '1' }
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "BUILD_NUMBER=$buildNumber" >> $env:GITHUB_OUTPUT
+          echo "TAG=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Build Flutter Windows
-        run: flutter build windows --build-name ${{ steps.version.outputs.VERSION }} --build-number ${{ github.run_number }}
+        run: flutter build windows --build-name ${{ steps.version.outputs.VERSION }} --build-number ${{ steps.version.outputs.BUILD_NUMBER }}
 
       - name: Update Inno Setup version
         shell: pwsh
@@ -43,9 +49,19 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\whisk.iss
 
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml
+          git diff --staged --quiet || git commit -m "chore: bump version to ${{ steps.version.outputs.VERSION }}"
+          git push
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: Whisk ${{ steps.version.outputs.VERSION }}
           files: |
             installer/whisk-setup-*.exe
           generate_release_notes: true
