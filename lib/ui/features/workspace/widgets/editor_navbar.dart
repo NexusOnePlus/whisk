@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 class EditorNavbar extends StatelessWidget {
@@ -20,105 +19,89 @@ class EditorNavbar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 52,
-      child: GlassPanel(
-        borderRadius: 16,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Back to dashboard',
-              onPressed: onCloseWorkspace,
-              icon: const Icon(Icons.arrow_back_rounded, color: kTextSecondary, size: 20),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Back to dashboard',
+            onPressed: onCloseWorkspace,
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: kTextSecondary,
+              size: 20,
             ),
-            _NavBarDropdown(
-              label: 'File',
-              items: [
-                _NavBarMenuItem(
-                  icon: Icons.file_open_outlined,
-                  label: 'Import file',
-                  onTap: onImportFile,
-                ),
-              ],
-            ),
-            _NavBarDropdown(
-              label: 'About',
-              items: [
-                _NavBarMenuItem(
-                  icon: Icons.info_outline,
-                  label: 'About Whisk',
-                  onTap: () {},
-                ),
-              ],
-            ),
-            Expanded(
-              child: Align(
-                alignment: Alignment.center,
-                child: FractionallySizedBox(
-                  widthFactor: 0.5,
-                  child: Row(
-                    children: [
-                      Icon(Icons.search_rounded, color: kTextMuted, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          style: const TextStyle(
-                            color: kTextPrimary,
+          ),
+          _NavBarDropdown(
+            label: 'File',
+            items: [
+              _NavBarMenuItem(
+                icon: Icons.file_open_outlined,
+                label: 'Import file',
+                onTap: onImportFile,
+              ),
+            ],
+          ),
+          _NavBarDropdown(
+            label: 'About',
+            items: [
+              _NavBarMenuItem(
+                icon: Icons.info_outline,
+                label: 'About Whisk',
+                onTap: () {},
+              ),
+            ],
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.center,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Row(
+                  children: [
+                    Icon(Icons.search_rounded, color: kTextMuted, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        style: const TextStyle(
+                          color: kTextPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar en el workspace...',
+                          hintStyle: TextStyle(
+                            color: kTextMuted,
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
                           ),
-                          decoration: const InputDecoration(
-                            hintText: 'Buscar en el workspace...',
-                            hintStyle: TextStyle(
-                              color: kTextMuted,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 14),
-                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: kGlassHighlight,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: kBorder),
-                        ),
-                        child: const Text(
-                          '\u2318K',
-                          style: TextStyle(
-                            color: kTextMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                       ),
                     ],
-                  ),
                 ),
               ),
             ),
-            IconButton(
-              tooltip: 'Create collaboration invite',
-              onPressed: onCreateInvite,
-              icon: const Icon(Icons.ios_share, size: 18),
-              color: kTextSecondary,
-              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-              padding: EdgeInsets.zero,
-            ),
-            IconButton(
-              tooltip: 'Join collaboration invite',
-              onPressed: onJoinInvite,
-              icon: const Icon(Icons.link, size: 18),
-              color: kTextSecondary,
-              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-              padding: EdgeInsets.zero,
-            ),
-          ],
-        ),
+          ),
+          IconButton(
+            tooltip: 'Create collaboration invite',
+            onPressed: onCreateInvite,
+            icon: const Icon(Icons.ios_share, size: 18),
+            color: kTextSecondary,
+            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+            padding: EdgeInsets.zero,
+          ),
+          IconButton(
+            tooltip: 'Join collaboration invite',
+            onPressed: onJoinInvite,
+            icon: const Icon(Icons.link, size: 18),
+            color: kTextSecondary,
+            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+            padding: EdgeInsets.zero,
+          ),
+        ],
       ),
     );
   }

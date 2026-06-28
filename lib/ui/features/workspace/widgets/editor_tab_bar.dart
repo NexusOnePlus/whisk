@@ -17,11 +17,11 @@ class EditorTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 44,
+      height: 38,
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: kBorder)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: openFiles.length,
@@ -43,10 +43,10 @@ class EditorTabBar extends StatelessWidget {
 
   IconData _iconFor(WhiskFile file) {
     return switch (file.extension) {
-      '.tex' => Icons.functions,
+      '.tex' => Icons.science_outlined,
       '.bib' => Icons.book_outlined,
       '.sty' || '.cls' => Icons.tune_outlined,
-      '.typ' => Icons.description_outlined,
+      '.typ' => Icons.code_outlined,
       '.md' => Icons.notes_outlined,
       '.mmd' => Icons.account_tree_outlined,
       _ => Icons.insert_drive_file_outlined,
@@ -73,15 +73,15 @@ class FileTabPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(8),
       onTap: onTap,
       child: Container(
-        height: 28,
+        height: 26,
         constraints: const BoxConstraints(maxWidth: 180),
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: active ? kGlassHighlight : kAppBlack.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: active ? (accent ?? kBorder) : kBorder),
           gradient: active
               ? LinearGradient(

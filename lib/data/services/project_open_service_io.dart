@@ -122,7 +122,13 @@ class ProjectOpenService {
   Future<List<FileSystemEntity>> listDirectoryEntries(String path) async {
     final dir = Directory(path);
     if (!await dir.exists()) return const [];
-    final entries = await dir.list(followLinks: false).toList();
+    final entries = <FileSystemEntity>[];
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is! Directory) continue;
+      final name = entity.path.split(Platform.pathSeparator).last;
+      if (_isIgnoredPath(path, entity.path)) continue;
+      entries.add(entity);
+    }
     entries.sort((a, b) => a.path.compareTo(b.path));
     return entries;
   }

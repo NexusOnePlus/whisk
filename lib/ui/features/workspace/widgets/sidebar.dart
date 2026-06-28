@@ -327,10 +327,10 @@ class _FilesSectionState extends State<_FilesSection> {
     if (file.isImage) return Icons.image_outlined;
     if (file.isPdf) return Icons.picture_as_pdf_outlined;
     return switch (file.extension) {
-      '.tex' => widget.environment.icon,
+      '.tex' => Icons.science_outlined,
       '.bib' => Icons.book_outlined,
       '.sty' || '.cls' => Icons.tune_outlined,
-      '.typ' => Icons.description_outlined,
+      '.typ' => Icons.code_outlined,
       '.md' => Icons.notes_outlined,
       '.mmd' => Icons.account_tree_outlined,
       _ => Icons.insert_drive_file_outlined,
@@ -376,12 +376,6 @@ class _FolderRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(
-                expanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
-                size: 18,
-                color: kTextMuted,
-              ),
-              const SizedBox(width: 2),
               Icon(
                 expanded ? Icons.folder_open : Icons.folder_outlined,
                 size: 18,

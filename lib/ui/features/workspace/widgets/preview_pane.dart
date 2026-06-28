@@ -80,9 +80,7 @@ class PreviewPane extends StatelessWidget {
   }
 
   Widget _buildPdfViewer() {
-    return Container(
-      color: kAppBlack,
-      child: switch (result.state) {
+    return switch (result.state) {
         RenderState.rendering => const Center(
           child: SizedBox(
             width: 24,
@@ -93,6 +91,7 @@ class PreviewPane extends StatelessWidget {
         RenderState.success when result.pdfPath != null => PdfViewer.file(
           result.pdfPath!,
           key: ValueKey(result.pdfPath),
+          params: const PdfViewerParams(backgroundColor: Colors.transparent),
         ),
         RenderState.failed => Center(
           child: Column(
@@ -114,7 +113,6 @@ class PreviewPane extends StatelessWidget {
             label: const Text('Render'),
           ),
         ),
-      },
-    );
+      };
   }
 }

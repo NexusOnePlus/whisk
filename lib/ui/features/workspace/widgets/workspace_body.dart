@@ -32,9 +32,10 @@ class WorkspaceBody extends StatelessWidget {
     if (active.isImage) {
       editor = ImageFilePane(file: active);
     } else if (active.isPdf) {
-      editor = Container(
-        color: kAppBlack,
-        child: PdfViewer.file(active.path, key: ValueKey(active.path)),
+      editor = PdfViewer.file(
+        active.path,
+        key: ValueKey(active.path),
+        params: const PdfViewerParams(backgroundColor: Colors.transparent),
       );
     } else {
       final remotePeers = viewModel.collaborationPeers

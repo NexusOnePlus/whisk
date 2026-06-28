@@ -55,7 +55,6 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          color: const Color(0xFF181818),
           child: Row(
             children: [
               SizedBox(
@@ -90,7 +89,7 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
                       openFiles: vm.openFiles,
                       onSelectFile: vm.openFile,
                     ),
-                    Container(height: 1, color: kBorder),
+                    const SizedBox(height: 6),
                     Expanded(
                       child: Column(
                         children: [
