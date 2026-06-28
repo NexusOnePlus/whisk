@@ -282,7 +282,7 @@ class _FilesSectionState extends State<_FilesSection> {
       ),
     ).then((fileName) {
       if (fileName != null && fileName.trim().isNotEmpty) {
-        final relativePath = folderPath.substring(root.length);
+        final relativePath = folderPath.substring(root.length).replaceFirst(RegExp(r'^[\\/]'), '');
         widget.onNewFile('$relativePath${Platform.pathSeparator}${fileName.trim()}');
       }
     });
@@ -301,7 +301,7 @@ class _FilesSectionState extends State<_FilesSection> {
       ),
     ).then((folderName) {
       if (folderName != null && folderName.trim().isNotEmpty) {
-        final relativePath = folderPath.substring(root.length);
+        final relativePath = folderPath.substring(root.length).replaceFirst(RegExp(r'^[\\/]'), '');
         widget.onNewFolder('$relativePath${Platform.pathSeparator}${folderName.trim()}');
       }
     });
