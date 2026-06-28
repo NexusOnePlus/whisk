@@ -7,22 +7,25 @@ import 'package:whisk/domain/models/whisk_project.dart';
 class ProjectOpenService {
   const ProjectOpenService();
 
-  Future<WhiskProject?> pickLatexProject() async {
+  Future<WhiskProject?> pickProject() async {
     final rootPath = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Open LaTeX project',
+      dialogTitle: 'Open project',
     );
     if (rootPath == null) return null;
 
     final root = Directory(rootPath);
     final files = await _listProjectFiles(root);
-    final source = _findLatexEntry(root, files);
-    if (source == null) return null;
+    if (files.isEmpty) return null;
 
-    final content = await source.readAsString();
+    final entry = _findEntryFile(root, files);
+    final content = entry != null ? await entry.readAsString() : '';
+
     final entryFile = WhiskFile(
-      path: source.path,
-      name: source.uri.pathSegments.last,
-      extension: '.tex',
+      path: entry?.path ?? files.first.path,
+      name: entry != null
+          ? entry.uri.pathSegments.last
+          : files.first.uri.pathSegments.last,
+      extension: extensionOf(entry?.path ?? files.first.path),
       content: content,
       projectRoot: root.path,
     );
@@ -35,7 +38,7 @@ class ProjectOpenService {
               path: file.path,
               name: file.uri.pathSegments.last,
               extension: extensionOf(file.path),
-              content: file.path == source.path ? content : '',
+              content: file.path == entry?.path ? content : '',
               projectRoot: root.path,
             ),
           )
@@ -44,13 +47,15 @@ class ProjectOpenService {
     );
   }
 
-  File? _findLatexEntry(Directory root, List<File> files) {
-    final main = File('${root.path}${Platform.pathSeparator}main.tex');
-    if (files.any((file) => file.path == main.path)) return main;
-
-    return files
-        .where((file) => file.path.toLowerCase().endsWith('.tex'))
-        .firstOrNull;
+  File? _findEntryFile(Directory root, List<File> files) {
+    const priority = ['.tex', '.typ', '.mmd', '.md'];
+    for (final ext in priority) {
+      final main = File('${root.path}${Platform.pathSeparator}main$ext');
+      if (files.any((f) => f.path == main.path)) return main;
+      final found = files.where((f) => f.path.endsWith(ext)).firstOrNull;
+      if (found != null) return found;
+    }
+    return files.firstOrNull;
   }
 
   Future<List<File>> listDirectoryFiles(String path) =>

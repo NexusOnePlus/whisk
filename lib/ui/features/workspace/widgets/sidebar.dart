@@ -1,11 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
-import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
+import 'package:whisk/ui/core/empty_section.dart';
+import 'package:whisk/ui/core/glass_dialogs.dart';
 
-enum ProjectSidebarSection { files, diagnostics, comments, renders }
+enum ProjectSidebarSection { files, search, diagnostics }
 
 class Sidebar extends StatelessWidget {
   const Sidebar({
@@ -29,19 +29,10 @@ class Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      borderRadius: 0,
-      opacity: 0.7,
-      blur: 28,
-      child: Container(
-        width: 292,
-        decoration: const BoxDecoration(
-          border: Border(right: BorderSide(color: kBorder)),
-        ),
+    return Container(
+      width: 260,
         child: Column(
           children: [
-            _ProjectHeader(environment: environment, file: file),
-            _SidebarNav(section: section),
             Expanded(
               child: _SidebarBody(
                 section: section,
@@ -56,172 +47,6 @@ class Sidebar extends StatelessWidget {
             const _SidebarStatus(),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ProjectHeader extends StatelessWidget {
-  const _ProjectHeader({required this.environment, required this.file});
-
-  final EnvironmentKind environment;
-  final WhiskFile file;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: kGlassBase.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: kAccentBlue.withValues(alpha: 0.3)),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  kAccentBlue.withValues(alpha: 0.15),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Icon(environment.icon, color: kAccentBlue, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.projectRoot == null
-                      ? '${environment.name} Draft'
-                      : file.projectRoot!.split(Platform.pathSeparator).last,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: kTextPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  file.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: kTextMuted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'Collapse sidebar',
-            onPressed: () {},
-            icon: const Icon(Icons.keyboard_double_arrow_left),
-            color: kTextSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SidebarNav extends StatelessWidget {
-  const _SidebarNav({required this.section});
-
-  final ProjectSidebarSection section;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: kAppBlack,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: kBorder),
-      ),
-      child: Row(
-        children: [
-          _NavButton(
-            icon: Icons.folder_outlined,
-            label: 'Files',
-            tooltip: 'Files',
-            active: section == ProjectSidebarSection.files,
-          ),
-          _NavButton(
-            icon: Icons.bug_report_outlined,
-            label: 'Diag',
-            tooltip: 'Diagnostics',
-            active: section == ProjectSidebarSection.diagnostics,
-          ),
-          _NavButton(
-            icon: Icons.mode_comment_outlined,
-            label: 'Comments',
-            tooltip: 'Comments',
-            active: section == ProjectSidebarSection.comments,
-          ),
-          _NavButton(
-            icon: Icons.play_circle_outline,
-            label: 'Runs',
-            tooltip: 'Renders',
-            active: section == ProjectSidebarSection.renders,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavButton extends StatelessWidget {
-  const _NavButton({
-    required this.icon,
-    required this.label,
-    required this.tooltip,
-    required this.active,
-  });
-
-  final IconData icon;
-  final String label;
-  final String tooltip;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Tooltip(
-        message: tooltip,
-        child: Container(
-          height: 34,
-          decoration: BoxDecoration(
-            color: active ? kGlassHighlight : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: active ? kTextPrimary : kTextMuted),
-              if (active || label == 'Comments') ...[
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: active ? kTextPrimary : kTextMuted,
-                      fontSize: 9,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -256,20 +81,11 @@ class _SidebarBody extends StatelessWidget {
         onNewFile: onNewFile,
         onDeleteFile: onDeleteFile,
       ),
-      ProjectSidebarSection.diagnostics => const _EmptySection(
+      ProjectSidebarSection.search => const _SearchSection(),
+      ProjectSidebarSection.diagnostics => const EmptySection(
         icon: Icons.bug_report_outlined,
         title: 'No diagnostics',
         message: 'Render or analyze the active file to populate this panel.',
-      ),
-      ProjectSidebarSection.comments => const _EmptySection(
-        icon: Icons.mode_comment_outlined,
-        title: 'No comments',
-        message: 'Comments will be scoped to the active file and selection.',
-      ),
-      ProjectSidebarSection.renders => const _EmptySection(
-        icon: Icons.play_circle_outline,
-        title: 'No renders yet',
-        message: 'Render history and exported artifacts will appear here.',
       ),
     };
   }
@@ -411,6 +227,61 @@ class _SearchBox extends StatelessWidget {
   }
 }
 
+class _SearchSection extends StatelessWidget {
+  const _SearchSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            autofocus: true,
+            style: const TextStyle(color: kTextPrimary, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Search files...',
+              hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+              prefixIcon: const Icon(Icons.search, color: kTextMuted, size: 19),
+              filled: true,
+              fillColor: kGlassHighlight,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: kBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: kBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: kAccentBlue),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search, color: kTextMuted, size: 28),
+                  SizedBox(height: 12),
+                  Text(
+                    'Search across all project files',
+                    style: TextStyle(color: kTextMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FileRow extends StatelessWidget {
   const _FileRow({
     required this.icon,
@@ -493,48 +364,6 @@ class _FileRow extends StatelessWidget {
   }
 }
 
-class _EmptySection extends StatelessWidget {
-  const _EmptySection({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: kTextMuted, size: 28),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: kTextPrimary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: kTextSecondary, height: 1.35),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.label);
 
@@ -580,207 +409,4 @@ class _SidebarStatus extends StatelessWidget {
   }
 }
 
-class GlassInputDialog extends StatelessWidget {
-  const GlassInputDialog({
-    super.key,
-    required this.title,
-    required this.hintText,
-    required this.confirmLabel,
-    this.initialValue = '',
-  });
 
-  final String title;
-  final String hintText;
-  final String confirmLabel;
-  final String initialValue;
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = TextEditingController(text: initialValue);
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: 40.0,
-        vertical: 24.0,
-      ),
-      child: GlassPanel(
-        borderRadius: 16,
-        opacity: 0.8,
-        blur: 32,
-        child: Container(
-          width: 320,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            border: Border.all(color: kBorder),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                style: const TextStyle(color: kTextPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: hintText,
-                  hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
-                  filled: true,
-                  fillColor: kGlassBase.withValues(alpha: 0.4),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: kBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: kBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: kAccentBlue),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(color: kTextMuted, fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(controller.text),
-                    style: TextButton.styleFrom(
-                      backgroundColor: kAccentBlue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                    ),
-                    child: Text(
-                      confirmLabel,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class GlassConfirmDialog extends StatelessWidget {
-  const GlassConfirmDialog({
-    super.key,
-    required this.title,
-    required this.message,
-    required this.confirmLabel,
-  });
-
-  final String title;
-  final String message;
-  final String confirmLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: GlassPanel(
-        borderRadius: 16,
-        opacity: 0.8,
-        blur: 32,
-        child: Container(
-          width: 320,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            border: Border.all(color: kBorder),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                message,
-                style: const TextStyle(
-                  color: kTextSecondary,
-                  fontSize: 13,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(color: kTextMuted, fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    style: TextButton.styleFrom(
-                      backgroundColor: kDangerRed,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                    ),
-                    child: Text(
-                      confirmLabel,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -2,19 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pdfrx/pdfrx.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
-import 'package:whisk/ui/core/glass_panel.dart';
+import 'package:whisk/ui/core/ambient_glow_painter.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
 import 'package:whisk/ui/features/editor/models/editor_selection_range.dart';
 import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
-import 'package:whisk/ui/features/workspace/widgets/preview_pane.dart';
-import 'package:whisk/ui/features/workspace/widgets/sidebar.dart';
-import 'package:whisk/ui/features/workspace/widgets/source_pane.dart';
-import 'package:whisk/ui/features/workspace/widgets/image_file_pane.dart';
-import 'package:whisk/ui/features/workspace/widgets/top_bar.dart';
+import 'package:whisk/ui/features/workspace/widgets/editor_content_frame.dart';
+import 'package:whisk/ui/features/workspace/widgets/editor_navbar.dart';
+import 'package:whisk/ui/features/workspace/widgets/join_invite_dialog.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -31,7 +28,8 @@ class WorkspaceScreen extends StatefulWidget {
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
 }
 
-class _WorkspaceScreenState extends State<WorkspaceScreen> {
+class _WorkspaceScreenState extends State<WorkspaceScreen>
+    with SingleTickerProviderStateMixin {
   late final WhiskEditorController _controller;
   late final FocusNode _editorFocusNode;
   late final TextEditingController _findController;
@@ -46,12 +44,17 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   String? _pendingContent;
   StreamSubscription? _operationSubscription;
   StreamSubscription? _remoteTextSubscription;
+  late final AnimationController _glowController;
 
   WorkspaceViewModel get viewModel => widget.viewModel;
 
   @override
   void initState() {
     super.initState();
+    _glowController = AnimationController(
+      duration: const Duration(seconds: 15),
+      vsync: this,
+    )..repeat();
     _controller = WhiskEditorController(
       text: viewModel.activeFile.content,
       environmentId: viewModel.selectedEnvironment.id,
@@ -72,6 +75,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   @override
   void dispose() {
     _flushPendingContent();
+    _glowController.dispose();
     _contentSyncTimer?.cancel();
     _presenceSyncTimer?.cancel();
     _operationSubscription?.cancel();
@@ -186,7 +190,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   Future<void> _joinCollaborationInvite() async {
     final invite = await showDialog<String>(
       context: context,
-      builder: (context) => const _JoinInviteDialog(),
+      builder: (context) => const JoinInviteDialog(),
     );
     if (!mounted || invite == null) return;
 
@@ -275,104 +279,65 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           listenable: viewModel,
           builder: (context, _) {
             return Scaffold(
+              backgroundColor: kAppBlack,
               body: SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isCompact = constraints.maxWidth < 860;
-
-                    if (isCompact) {
-                      return Column(
-                        children: [
-                          TopBar(
-                            file: viewModel.activeFile,
-                            openFiles: viewModel.openFiles,
-                            environment: viewModel.selectedEnvironment,
-                            onSelectFile: viewModel.openFile,
-                            onCloseWorkspace: widget.onCloseWorkspace,
-                            onCreateInvite: _createCollaborationInvite,
-                            onJoinInvite: _joinCollaborationInvite,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ExcludeSemantics(
+                        child: RepaintBoundary(
+                          child: AnimatedBuilder(
+                            animation: _glowController,
+                            builder: (context, _) {
+                          return CustomPaint(
+                            painter: AmbientGlowPainter(
+                                  animationValue: _glowController.value,
+                                ),
+                              );
+                            },
                           ),
-                          if (_findOpen)
-                            _FindBar(
-                              controller: _findController,
-                              focusNode: _findFocusNode,
-                              matchCount: _findMatches.length,
-                              currentMatch: _findMatches.isEmpty
-                                  ? 0
-                                  : _findCursor + 1,
-                              onChanged: (_) => setState(_refreshFindMatches),
-                              onPrevious: () => _moveFind(-1),
-                              onNext: () => _moveFind(1),
-                              onClose: _toggleFind,
-                            ),
-                          Expanded(
-                            child: _WorkspaceBody(
-                              viewModel: viewModel,
-                              controller: _controller,
-                              editorFocusNode: _editorFocusNode,
-                              onEditorChanged: _handleEditorChanged,
-                              revealRevision: _revealRevision,
-                              revealOffset: _revealOffset,
-                              compact: true,
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-
-                    return Row(
+                        ),
+                      ),
+                    ),
+                    Row(
                       children: [
                         const WorkspaceRail(),
-                        Sidebar(
-                          file: viewModel.activeFile,
-                          files: viewModel.projectFiles,
-                          environment: viewModel.selectedEnvironment,
-                          onOpenFile: viewModel.openFile,
-                          onNewFile: viewModel.createFile,
-                          onDeleteFile: viewModel.deleteFile,
-                        ),
                         Expanded(
-                          child: Column(
-                            children: [
-                              TopBar(
-                                file: viewModel.activeFile,
-                                openFiles: viewModel.openFiles,
-                                environment: viewModel.selectedEnvironment,
-                                onSelectFile: viewModel.openFile,
-                                onCloseWorkspace: widget.onCloseWorkspace,
-                                onCreateInvite: _createCollaborationInvite,
-                                onJoinInvite: _joinCollaborationInvite,
-                              ),
-                              if (_findOpen)
-                                _FindBar(
-                                  controller: _findController,
-                                  focusNode: _findFocusNode,
-                                  matchCount: _findMatches.length,
-                                  currentMatch: _findMatches.isEmpty
-                                      ? 0
-                                      : _findCursor + 1,
-                                  onChanged: (_) =>
-                                      setState(_refreshFindMatches),
-                                  onPrevious: () => _moveFind(-1),
-                                  onNext: () => _moveFind(1),
-                                  onClose: _toggleFind,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              children: [
+                                EditorNavbar(
+                                  onCloseWorkspace: widget.onCloseWorkspace,
                                 ),
-                              Expanded(
-                                child: _WorkspaceBody(
-                                  viewModel: viewModel,
-                                  controller: _controller,
-                                  editorFocusNode: _editorFocusNode,
-                                  onEditorChanged: _handleEditorChanged,
-                                  revealRevision: _revealRevision,
-                                  revealOffset: _revealOffset,
-                                ),
-                              ),
-                            ],
+                                const SizedBox(height: 6),
+                                EditorContentFrame(
+                                      viewModel: viewModel,
+                                    controller: _controller,
+                                    editorFocusNode: _editorFocusNode,
+                                    onEditorChanged: _handleEditorChanged,
+                                    revealRevision: _revealRevision,
+                                    revealOffset: _revealOffset,
+                                    findOpen: _findOpen,
+                                    findController: _findController,
+                                    findFocusNode: _findFocusNode,
+                                    findMatches: _findMatches,
+                                    findCursor: _findCursor,
+                                    onToggleFind: _toggleFind,
+                                    onRefreshFind: _refreshFindMatches,
+                                    onMoveFind: _moveFind,
+                                    onCreateInvite:
+                                        _createCollaborationInvite,
+                                    onJoinInvite:
+                                        _joinCollaborationInvite,
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
             );
@@ -383,250 +348,4 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 }
 
-class _FindBar extends StatelessWidget {
-  const _FindBar({
-    required this.controller,
-    required this.focusNode,
-    required this.matchCount,
-    required this.currentMatch,
-    required this.onChanged,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onClose,
-  });
 
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final int matchCount;
-  final int currentMatch;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      borderRadius: 0,
-      opacity: 0.8,
-      blur: 32,
-      child: Container(
-        height: 42,
-        padding: const EdgeInsets.fromLTRB(14, 4, 156, 6),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: kBorder)),
-        ),
-        child: Row(
-          children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                onChanged: onChanged,
-                onSubmitted: (_) => onNext(),
-                style: const TextStyle(color: kTextPrimary, fontSize: 12),
-                decoration: InputDecoration(
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  prefixIcon: const Icon(Icons.search, size: 16),
-                  prefixIconConstraints: const BoxConstraints(
-                    minWidth: 34,
-                    minHeight: 28,
-                  ),
-                  hintText: 'Find in file',
-                  hintStyle: const TextStyle(color: kTextMuted, fontSize: 12),
-                  filled: true,
-                  fillColor: kGlassBase.withValues(alpha: 0.4),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: kBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: kBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: kAccentBlue),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              '$currentMatch / $matchCount',
-              style: const TextStyle(color: kTextMuted, fontSize: 12),
-            ),
-            const SizedBox(width: 6),
-            IconButton(
-              tooltip: 'Previous match',
-              onPressed: onPrevious,
-              icon: const Icon(Icons.keyboard_arrow_up),
-              color: kTextSecondary,
-              iconSize: 18,
-              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-              padding: EdgeInsets.zero,
-            ),
-            IconButton(
-              tooltip: 'Next match',
-              onPressed: onNext,
-              icon: const Icon(Icons.keyboard_arrow_down),
-              color: kTextSecondary,
-              iconSize: 18,
-              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-              padding: EdgeInsets.zero,
-            ),
-            const Spacer(),
-            IconButton(
-              tooltip: 'Close find',
-              onPressed: onClose,
-              icon: const Icon(Icons.close),
-              color: kTextSecondary,
-              iconSize: 17,
-              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-              padding: EdgeInsets.zero,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _JoinInviteDialog extends StatefulWidget {
-  const _JoinInviteDialog();
-
-  @override
-  State<_JoinInviteDialog> createState() => _JoinInviteDialogState();
-}
-
-class _JoinInviteDialogState extends State<_JoinInviteDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Join collaboration'),
-      content: SizedBox(
-        width: 520,
-        child: TextField(
-          controller: _controller,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            labelText: 'Invite',
-            hintText: 'Paste collaboration invite',
-            border: OutlineInputBorder(),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final invite = _controller.text.trim();
-            if (invite.isEmpty) return;
-            Navigator.of(context).pop(invite);
-          },
-          child: const Text('Join'),
-        ),
-      ],
-    );
-  }
-}
-
-class _WorkspaceBody extends StatelessWidget {
-  const _WorkspaceBody({
-    required this.viewModel,
-    required this.controller,
-    required this.editorFocusNode,
-    required this.onEditorChanged,
-    required this.revealRevision,
-    this.revealOffset,
-    this.compact = false,
-  });
-
-  final WorkspaceViewModel viewModel;
-  final WhiskEditorController controller;
-  final FocusNode editorFocusNode;
-  final ValueChanged<String> onEditorChanged;
-  final int revealRevision;
-  final int? revealOffset;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = viewModel.activeFile;
-    final Widget editor;
-    if (active.isImage) {
-      editor = ImageFilePane(file: active);
-    } else if (active.isPdf) {
-      editor = Container(
-        color: kAppBlack,
-        child: PdfViewer.file(active.path, key: ValueKey(active.path)),
-      );
-    } else {
-      final remotePeers = viewModel.collaborationPeers
-          .where((peer) => peer.filePath == active.path)
-          .toList(growable: false);
-      editor = SourcePane(
-        environment: viewModel.selectedEnvironment,
-        controller: controller,
-        focusNode: editorFocusNode,
-        remotePeers: remotePeers,
-        revealRevision: revealRevision,
-        revealOffset: revealOffset,
-        onChanged: onEditorChanged,
-      );
-    }
-    final preview = PreviewPane(
-      environment: viewModel.selectedEnvironment,
-      result: viewModel.renderResult,
-      onRender: viewModel.renderActiveFile,
-    );
-
-    final showPreview = !active.isImage && !active.isPdf;
-
-    if (!showPreview) {
-      return editor;
-    }
-
-    if (compact) {
-      return Column(
-        children: [
-          Expanded(child: editor),
-          const Divider(height: 1, color: kBorder),
-          Expanded(child: preview),
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        Expanded(child: editor),
-        const VerticalDivider(width: 1, color: kBorder),
-        Expanded(child: preview),
-      ],
-    );
-  }
-}

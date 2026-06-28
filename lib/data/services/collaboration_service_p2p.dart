@@ -252,14 +252,16 @@ class CollaborationServiceP2p
   @override
   void broadcastTextChange(CollaborationTextUpdate update) {
     if (update.peerId != peerId) return;
-    _engine?.applyLocalEdit(
-      filePath: update.filePath,
-      op: RustTextOperation(
-        offset: update.operation.offset,
-        deletedLength: update.operation.deletedText.length,
-        insertedText: update.operation.insertedText,
-      ),
-    );
+    try {
+      _engine?.applyLocalEdit(
+        filePath: update.filePath,
+        op: RustTextOperation(
+          offset: update.operation.offset,
+          deletedLength: update.operation.deletedText.length,
+          insertedText: update.operation.insertedText,
+        ),
+      );
+    } catch (_) {}
     _broadcastCrdtUpdate(update.filePath, operation: update.operation);
     _transport.broadcastTextUpdate(update);
   }
@@ -267,14 +269,16 @@ class CollaborationServiceP2p
   @override
   void receiveTextUpdate(CollaborationTextUpdate update) {
     if (update.peerId == peerId) return;
-    _engine?.applyLocalEdit(
-      filePath: update.filePath,
-      op: RustTextOperation(
-        offset: update.operation.offset,
-        deletedLength: update.operation.deletedText.length,
-        insertedText: update.operation.insertedText,
-      ),
-    );
+    try {
+      _engine?.applyLocalEdit(
+        filePath: update.filePath,
+        op: RustTextOperation(
+          offset: update.operation.offset,
+          deletedLength: update.operation.deletedText.length,
+          insertedText: update.operation.insertedText,
+        ),
+      );
+    } catch (_) {}
     _textController.add(update);
   }
 
@@ -401,14 +405,23 @@ class CollaborationServiceP2p
       if (envelope.filePath == null || envelope.update == null) continue;
       _markIrohPeerSeen(envelope.peerId);
 
-      final oldText = engine.getText(filePath: envelope.filePath!);
-      if (!engine.applyRemoteUpdate(
-        filePath: envelope.filePath!,
-        update: envelope.update!,
-      )) {
+      String oldText;
+      try {
+        oldText = engine.getText(filePath: envelope.filePath!);
+      } catch (_) {
         continue;
       }
-      final newText = engine.getText(filePath: envelope.filePath!);
+      final applied = engine.applyRemoteUpdate(
+        filePath: envelope.filePath!,
+        update: envelope.update!,
+      );
+      if (!applied) continue;
+      final String newText;
+      try {
+        newText = engine.getText(filePath: envelope.filePath!);
+      } catch (_) {
+        continue;
+      }
       if (envelope.peerId != null && envelope.stateVector != null) {
         _setStateVectorFor(
           peerId: envelope.peerId!,

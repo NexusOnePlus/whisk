@@ -25,9 +25,17 @@ class WorkspaceViewModel extends ChangeNotifier {
     this._openService = const ProjectOpenService(),
     WhiskFile? initialFile,
     List<WhiskFile>? projectFiles,
+    int startEnvIndex = 0,
   }) : _environments = catalog.listEnvironments() {
-    _activeFile = initialFile ?? _fileForEnvironment(_environments.first);
-    _projectFiles = projectFiles ?? [_activeFile];
+    _selectedEnvironmentIndex = startEnvIndex.clamp(0, _environments.length - 1);
+    if (initialFile != null) {
+      _activeFile = initialFile;
+      _projectFiles = projectFiles ?? [initialFile];
+    } else {
+      _draftRootPath = computeDraftRootPath(_environments[_selectedEnvironmentIndex]);
+      _activeFile = _fileForEnvironment(_environments[_selectedEnvironmentIndex]);
+      _projectFiles = [_activeFile];
+    }
     _openFiles = [_activeFile];
     _initWatcher();
     _initCollaboration();
@@ -43,6 +51,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   StreamSubscription? _remoteFilesSubscription;
   Directory? _guestDraftRoot;
   final _guestDraftPaths = <String, String>{};
+  String? _draftRootPath;
   List<CollaborationPeer> _collaborationPeers = const [];
   final List<EnvironmentKind> _environments;
   late WhiskFile _activeFile;
@@ -188,6 +197,10 @@ class WorkspaceViewModel extends ChangeNotifier {
   void _initWatcher() {
     final root = _activeFile.projectRoot;
     if (root == null) return;
+
+    if (_draftRootPath != null) {
+      Directory(_draftRootPath!).createSync(recursive: true);
+    }
 
     _watcherSubscription = _watcherService.watchDirectory(root).listen((event) {
       if (_disposed) return;
@@ -456,6 +469,16 @@ class WorkspaceViewModel extends ChangeNotifier {
   }
 
   WhiskFile _fileForEnvironment(EnvironmentKind environment) {
+    final root = _draftRootPath;
+    if (root != null) {
+      return WhiskFile(
+        path: '$root${Platform.pathSeparator}main${environment.extension}',
+        name: 'main${environment.extension}',
+        extension: environment.extension,
+        content: environment.sample,
+        projectRoot: root,
+      );
+    }
     return WhiskFile(
       path: 'sample/${environment.id}${environment.extension}',
       name: '${environment.id}${environment.extension}',
@@ -463,4 +486,28 @@ class WorkspaceViewModel extends ChangeNotifier {
       content: environment.sample,
     );
   }
+
+  static String computeDraftRootPath(EnvironmentKind env) {
+    final now = DateTime.now();
+    final timestamp =
+        '${now.year}-${_pad(now.month)}-${_pad(now.day)} '
+        '${_pad(now.hour)}.${_pad(now.minute)}.${_pad(now.second)}';
+    return '${_documentsPath()}${Platform.pathSeparator}Whisk Docs'
+        '${Platform.pathSeparator}${env.name} $timestamp';
+  }
+
+  static String _documentsPath() {
+    if (Platform.isWindows) {
+      final userProfile = Platform.environment['USERPROFILE'];
+      if (userProfile != null) return '$userProfile\\Documents';
+      final homeDrive = Platform.environment['HOMEDRIVE'] ?? 'C:';
+      final homePath = Platform.environment['HOMEPATH'] ?? '\\Users\\Default';
+      return '$homeDrive$homePath\\Documents';
+    }
+    final home = Platform.environment['HOME'];
+    if (home != null) return '$home/Documents';
+    return Directory.systemTemp.path;
+  }
+
+  static String _pad(int n) => n.toString().padLeft(2, '0');
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -9,16 +8,10 @@ class WorkspaceRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DragToMoveArea(
-      child: GlassPanel(
-        borderRadius: 0,
-        opacity: 0.9,
-        blur: 40,
-        child: Container(
-          width: 74,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: const BoxDecoration(
-            border: Border(right: BorderSide(color: kBorder)),
-          ),
+      child: Container(
+        width: 74,
+        color: kAppBlack,
+        padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
             children: [
               const _RailMark(),
@@ -68,7 +61,6 @@ class WorkspaceRail extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }

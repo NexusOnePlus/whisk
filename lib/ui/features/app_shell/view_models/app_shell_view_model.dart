@@ -1,13 +1,26 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:whisk/data/repositories/environment_catalog.dart';
 import 'package:whisk/data/services/collaboration_service_p2p.dart';
 import 'package:whisk/data/services/project_open_service.dart';
+import 'package:whisk/data/services/recent_project_service.dart';
+import 'package:whisk/domain/models/recent_project.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
 
 enum AppShellMode { dashboard, workspace, localCollaboration }
 
 class AppShellViewModel extends ChangeNotifier {
-  AppShellViewModel({this._projectOpenService = const ProjectOpenService()});
+  AppShellViewModel({this._projectOpenService = const ProjectOpenService()}) {
+    _recentProjectService.addListener(_onRecentsChanged);
+    _recentProjectService.load();
+  }
+
+  final RecentProjectService _recentProjectService = RecentProjectService();
+  List<RecentProject> get recentProjects => _recentProjectService.projects;
+
+  void _onRecentsChanged() => notifyListeners();
 
   static const _localPeerColors = [
     Colors.cyanAccent,
@@ -38,13 +51,22 @@ class AppShellViewModel extends ChangeNotifier {
   List<WorkspaceViewModel> get collaborationViewModels =>
       List.unmodifiable(_collaborationViewModels);
 
-  void openDraftWorkspace() {
+  void openDraftWorkspace(int envIndex) {
     if (_disposed) return;
+    final env = const EnvironmentCatalog().listEnvironments()[envIndex];
+    final rootPath = WorkspaceViewModel.computeDraftRootPath(env);
+    _recentProjectService.save(RecentProject(
+      path: rootPath,
+      name: rootPath.split(Platform.pathSeparator).last,
+      type: env.id,
+      lastOpened: DateTime.now().millisecondsSinceEpoch,
+    ));
     for (final workspace in _collaborationViewModels) {
       workspace.dispose();
     }
     _collaborationViewModels = const [];
     _workspaceViewModel = WorkspaceViewModel(
+      startEnvIndex: envIndex,
       collaborationService: CollaborationServiceP2p(),
     );
     _mode = AppShellMode.workspace;
@@ -96,10 +118,22 @@ class AppShellViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> openLatexProject() async {
-    final project = await _projectOpenService.pickLatexProject();
+  void _saveRecentForPath(String path, String type) {
+    _recentProjectService.save(RecentProject(
+      path: path,
+      name: path.split(Platform.pathSeparator).last,
+      type: type,
+      lastOpened: DateTime.now().millisecondsSinceEpoch,
+    ));
+  }
+
+  Future<void> openProject() async {
+    final project = await _projectOpenService.pickProject();
     if (_disposed) return;
     if (project == null) return;
+
+    final rootPath = project.rootPath;
+    _saveRecentForPath(rootPath, 'folder');
 
     _workspaceViewModel?.dispose();
     for (final workspace in _collaborationViewModels) {

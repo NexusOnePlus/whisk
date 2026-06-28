@@ -32,8 +32,9 @@ class _AppShellState extends State<AppShell> {
       builder: (context, _) {
         return switch (viewModel.mode) {
           AppShellMode.dashboard => DashboardScreen(
-            onOpenDraftWorkspace: viewModel.openDraftWorkspace,
-            onOpenLatexProject: viewModel.openLatexProject,
+            recentProjects: viewModel.recentProjects,
+            onOpenDraftWorkspace: (int i) => viewModel.openDraftWorkspace(i),
+            onOpenProject: viewModel.openProject,
             onOpenLocalCollaboration: viewModel.openLocalCollaborationDemo,
             onJoinSharedWorkspace: viewModel.joinSharedWorkspace,
             activeWorkspaceTitle: viewModel.activeWorkspaceTitle,

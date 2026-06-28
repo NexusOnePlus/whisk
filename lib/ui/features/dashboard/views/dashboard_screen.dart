@@ -1,23 +1,24 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:whisk/ui/core/glass_panel.dart';
+import 'package:whisk/domain/models/recent_project.dart';
+import 'package:whisk/ui/core/ambient_glow_painter.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
-import 'package:whisk/ui/features/dashboard/widgets/dashboard_card.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
+    required this.recentProjects,
     required this.onOpenDraftWorkspace,
-    required this.onOpenLatexProject,
+    required this.onOpenProject,
     required this.onOpenLocalCollaboration,
     required this.onJoinSharedWorkspace,
     this.activeWorkspaceTitle,
     this.onResumeActiveWorkspace,
   });
 
-  final VoidCallback onOpenDraftWorkspace;
-  final VoidCallback onOpenLatexProject;
+  final List<RecentProject> recentProjects;
+  final ValueChanged<int> onOpenDraftWorkspace;
+  final VoidCallback onOpenProject;
   final VoidCallback onOpenLocalCollaboration;
   final Future<bool> Function(String invite) onJoinSharedWorkspace;
   final String? activeWorkspaceTitle;
@@ -53,66 +54,35 @@ class _DashboardScreenState extends State<DashboardScreen>
       body: SafeArea(
         child: Stack(
           children: [
-            // Ambient glowing background circles
             Positioned.fill(
-              child: AnimatedBuilder(
-                animation: _glowController,
-                builder: (context, _) {
-                  return CustomPaint(
-                    painter: _AmbientGlowPainter(
-                      animationValue: _glowController.value,
-                    ),
-                  );
-                },
+              child: ExcludeSemantics(
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _glowController,
+                    builder: (context, _) {
+                          return CustomPaint(
+                            painter: AmbientGlowPainter(
+                          animationValue: _glowController.value,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
             Row(
               children: [
                 const WorkspaceRail(),
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 900;
-                      return SingleChildScrollView(
-                        padding: EdgeInsets.all(compact ? 18 : 28),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _DashboardHeader(),
-                            const SizedBox(height: 24),
-                            compact
-                                ? _CompactDashboard(
-                                    onOpenDraftWorkspace:
-                                        widget.onOpenDraftWorkspace,
-                                    onOpenLatexProject:
-                                        widget.onOpenLatexProject,
-                                    onOpenLocalCollaboration:
-                                        widget.onOpenLocalCollaboration,
-                                    onJoinSharedWorkspace:
-                                        widget.onJoinSharedWorkspace,
-                                    activeWorkspaceTitle:
-                                        widget.activeWorkspaceTitle,
-                                    onResumeActiveWorkspace:
-                                        widget.onResumeActiveWorkspace,
-                                  )
-                                : _WideDashboard(
-                                    onOpenDraftWorkspace:
-                                        widget.onOpenDraftWorkspace,
-                                    onOpenLatexProject:
-                                        widget.onOpenLatexProject,
-                                    onOpenLocalCollaboration:
-                                        widget.onOpenLocalCollaboration,
-                                    onJoinSharedWorkspace:
-                                        widget.onJoinSharedWorkspace,
-                                    activeWorkspaceTitle:
-                                        widget.activeWorkspaceTitle,
-                                    onResumeActiveWorkspace:
-                                        widget.onResumeActiveWorkspace,
-                                  ),
-                          ],
-                        ),
-                      );
-                    },
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        _NavbarFrame(),
+                        const SizedBox(height: 6),
+                        Expanded(child: _ContentFrame(dashboard: this)),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -124,306 +94,190 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 }
 
-class _AmbientGlowPainter extends CustomPainter {
-  _AmbientGlowPainter({required this.animationValue});
-
-  final double animationValue;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint1 = Paint()
-      ..shader =
-          RadialGradient(
-            colors: [
-              kAccentBlue.withValues(alpha: 0.12),
-              kAccentBlue.withValues(alpha: 0.0),
-            ],
-          ).createShader(
-            Rect.fromCircle(
-              center: Offset(
-                size.width * 0.3 + 50 * math.sin(animationValue * 2 * math.pi),
-                size.height * 0.4 + 60 * math.cos(animationValue * 2 * math.pi),
-              ),
-              radius: size.width * 0.35,
-            ),
-          );
-
-    final paint2 = Paint()
-      ..shader =
-          RadialGradient(
-            colors: [
-              kAccentAmber.withValues(alpha: 0.08),
-              kAccentAmber.withValues(alpha: 0.0),
-            ],
-          ).createShader(
-            Rect.fromCircle(
-              center: Offset(
-                size.width * 0.7 + 60 * math.cos(animationValue * 2 * math.pi),
-                size.height * 0.6 + 50 * math.sin(animationValue * 2 * math.pi),
-              ),
-              radius: size.width * 0.4,
-            ),
-          );
-
-    final paint3 = Paint()
-      ..shader =
-          RadialGradient(
-            colors: [
-              kSuccessGreen.withValues(alpha: 0.06),
-              kSuccessGreen.withValues(alpha: 0.0),
-            ],
-          ).createShader(
-            Rect.fromCircle(
-              center: Offset(
-                size.width * 0.5 +
-                    80 * math.sin((animationValue + 0.5) * 2 * math.pi),
-                size.height * 0.2 +
-                    40 * math.cos((animationValue + 0.5) * 2 * math.pi),
-              ),
-              radius: size.width * 0.3,
-            ),
-          );
-
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint1);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint2);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint3);
-  }
-
-  @override
-  bool shouldRepaint(covariant _AmbientGlowPainter oldDelegate) {
-    return oldDelegate.animationValue != animationValue;
-  }
-}
-
-class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader();
-
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
+class _NavbarFrame extends StatelessWidget {
+  const _NavbarFrame();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${_getGreeting()}, Editor',
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+    return SizedBox(
+      height: 56,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          color: const Color(0xFF181818),
+          child: Center(
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.5,
+              child: const TextField(
+                style: TextStyle(color: kTextPrimary, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Buscar...',
+                  hintStyle: TextStyle(color: kTextMuted),
+                  prefixIcon:
+                      Icon(Icons.search, color: kTextMuted, size: 20),
+                  border: InputBorder.none,
+                  filled: true,
+                  fillColor: Color(0xFF22262E),
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Create, reopen and collaborate across renderable projects.',
-                style: TextStyle(color: kTextSecondary, fontSize: 15),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: GlassPanel(
-            borderRadius: 999,
-            opacity: 0.5,
-            child: Container(
-              height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: const Row(
-                children: [
-                  Icon(Icons.search, color: kTextMuted, size: 20),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Search projects, files, peers...',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: kTextMuted),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
 
-class _WideDashboard extends StatelessWidget {
-  const _WideDashboard({
-    required this.onOpenDraftWorkspace,
-    required this.onOpenLatexProject,
-    required this.onOpenLocalCollaboration,
-    required this.onJoinSharedWorkspace,
-    this.activeWorkspaceTitle,
-    this.onResumeActiveWorkspace,
-  });
+class _ContentFrame extends StatelessWidget {
+  const _ContentFrame({required this.dashboard});
 
-  final VoidCallback onOpenDraftWorkspace;
-  final VoidCallback onOpenLatexProject;
-  final VoidCallback onOpenLocalCollaboration;
-  final Future<bool> Function(String invite) onJoinSharedWorkspace;
-  final String? activeWorkspaceTitle;
-  final VoidCallback? onResumeActiveWorkspace;
+  final _DashboardScreenState dashboard;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 260,
-          child: _ProjectActions(
-            onOpenDraftWorkspace: onOpenDraftWorkspace,
-            onOpenLatexProject: onOpenLatexProject,
-          ),
-        ),
-        const SizedBox(width: 18),
-        Expanded(
-          flex: 2,
-          child: Column(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        color: const Color(0xFF181818),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _OpenProjectsCard(
-                activeWorkspaceTitle: activeWorkspaceTitle,
-                onResumeActiveWorkspace: onResumeActiveWorkspace,
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionLabel('Nuevo'),
+                    const SizedBox(height: 12),
+                    _NewProjectGrid(
+                      onOpenDraftWorkspace:
+                          dashboard.widget.onOpenDraftWorkspace,
+                      onOpenProject:
+                          dashboard.widget.onOpenProject,
+                    ),
+                    const SizedBox(height: 32),
+                    const _SectionLabel('Recientes'),
+                    const SizedBox(height: 12),
+                    _RecentProjectsGrid(
+                      projects: dashboard.widget.recentProjects,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 18),
-              const _RecentFilesCard(),
+              const SizedBox(width: 16),
+              SizedBox(
+                width: 260,
+                child: _CollaborationPanel(
+                  recentProjects: dashboard.widget.recentProjects,
+                  onJoinSharedWorkspace:
+                      dashboard.widget.onJoinSharedWorkspace,
+                ),
+              ),
             ],
           ),
         ),
-        const SizedBox(width: 18),
-        SizedBox(
-          width: 280,
-          child: _CollaborationCard(
-            onOpenLocalCollaboration: onOpenLocalCollaboration,
-            onJoinSharedWorkspace: onJoinSharedWorkspace,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _CompactDashboard extends StatelessWidget {
-  const _CompactDashboard({
-    required this.onOpenDraftWorkspace,
-    required this.onOpenLatexProject,
-    required this.onOpenLocalCollaboration,
-    required this.onJoinSharedWorkspace,
-    this.activeWorkspaceTitle,
-    this.onResumeActiveWorkspace,
-  });
-
-  final VoidCallback onOpenDraftWorkspace;
-  final VoidCallback onOpenLatexProject;
-  final VoidCallback onOpenLocalCollaboration;
-  final Future<bool> Function(String invite) onJoinSharedWorkspace;
-  final String? activeWorkspaceTitle;
-  final VoidCallback? onResumeActiveWorkspace;
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _ProjectActions(
-          onOpenDraftWorkspace: onOpenDraftWorkspace,
-          onOpenLatexProject: onOpenLatexProject,
-        ),
-        const SizedBox(height: 16),
-        _OpenProjectsCard(
-          activeWorkspaceTitle: activeWorkspaceTitle,
-          onResumeActiveWorkspace: onResumeActiveWorkspace,
-        ),
-        const SizedBox(height: 16),
-        const _RecentFilesCard(),
-        const SizedBox(height: 16),
-        _CollaborationCard(
-          onOpenLocalCollaboration: onOpenLocalCollaboration,
-          onJoinSharedWorkspace: onJoinSharedWorkspace,
-        ),
-      ],
-    );
-  }
-}
-
-class _ProjectActions extends StatelessWidget {
-  const _ProjectActions({
-    required this.onOpenDraftWorkspace,
-    required this.onOpenLatexProject,
-  });
-
-  final VoidCallback onOpenDraftWorkspace;
-  final VoidCallback onOpenLatexProject;
-
-  @override
-  Widget build(BuildContext context) {
-    return DashboardCard(
-      title: 'New Project',
-      trailing: IconButton(
-        tooltip: 'Create project',
-        onPressed: () {},
-        icon: const Icon(Icons.add),
+    return Text(
+      label,
+      style: const TextStyle(
         color: kTextPrimary,
-      ),
-      child: Column(
-        children: [
-          _CreateProjectRow(
-            icon: Icons.functions,
-            title: 'LaTeX Draft',
-            subtitle: 'Start from a sample .tex file',
-            onTap: onOpenDraftWorkspace,
-          ),
-          const _CreateProjectRow(
-            icon: Icons.description_outlined,
-            title: 'Typst Project',
-            subtitle: 'Fast structured documents',
-          ),
-          const _CreateProjectRow(
-            icon: Icons.account_tree_outlined,
-            title: 'Mermaid Project',
-            subtitle: 'Diagrams and flows',
-          ),
-          _CreateProjectRow(
-            icon: Icons.folder_open_outlined,
-            title: 'Open LaTeX Folder',
-            subtitle: 'Load main.tex or first .tex file',
-            onTap: onOpenLatexProject,
-          ),
-        ],
+        fontSize: 35,
+        fontWeight: FontWeight.w400,
       ),
     );
   }
 }
 
-class _HoverableCard extends StatefulWidget {
-  const _HoverableCard({
-    required this.child,
-    this.onTap,
-    this.padding = const EdgeInsets.all(12),
-  }) : margin = const EdgeInsets.only(bottom: 10);
+class _NewProjectGrid extends StatelessWidget {
+  const _NewProjectGrid({
+    required this.onOpenDraftWorkspace,
+    required this.onOpenProject,
+  });
 
-  final Widget child;
-  final VoidCallback? onTap;
-  final EdgeInsetsGeometry padding;
-  final EdgeInsetsGeometry margin;
+  final ValueChanged<int> onOpenDraftWorkspace;
+  final VoidCallback onOpenProject;
 
   @override
-  State<_HoverableCard> createState() => _HoverableCardState();
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = 12.0;
+        final count = 4;
+        final totalSpacing = spacing * (count - 1);
+        final cardWidth = (constraints.maxWidth - totalSpacing) / count;
+        return Row(
+          children: [
+            _ProjectCard(
+              width: cardWidth,
+              icon: Icons.functions,
+              label: 'LaTeX',
+              color: kAccentBlue,
+              onTap: () => onOpenDraftWorkspace(0),
+            ),
+            SizedBox(width: spacing),
+            _ProjectCard(
+              width: cardWidth,
+              icon: Icons.description_outlined,
+              label: 'Typst',
+              color: kSuccessGreen,
+              onTap: () => onOpenDraftWorkspace(1),
+            ),
+            SizedBox(width: spacing),
+            _ProjectCard(
+              width: cardWidth,
+              icon: Icons.account_tree_outlined,
+              label: 'Mermaid',
+              color: kAccentAmber,
+              onTap: () => onOpenDraftWorkspace(2),
+            ),
+            SizedBox(width: spacing),
+            _ProjectCard(
+              width: cardWidth,
+              icon: Icons.folder_open_outlined,
+              label: 'Open Folder',
+              color: const Color(0xFF5A6570),
+              onTap: onOpenProject,
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
-class _HoverableCardState extends State<_HoverableCard>
+class _ProjectCard extends StatefulWidget {
+  const _ProjectCard({
+    required this.width,
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
+
+  final double width;
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  State<_ProjectCard> createState() => _ProjectCardState();
+}
+
+class _ProjectCardState extends State<_ProjectCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
@@ -454,334 +308,165 @@ class _HoverableCardState extends State<_HoverableCard>
       onExit: (_) => _controller.reverse(),
       child: AnimatedBuilder(
         animation: _animation,
-        builder: (context, child) {
-          final transform = Matrix4.translationValues(
-            0,
-            -3 * _animation.value,
-            0,
-          );
-          final opacity = 0.4 + 0.2 * _animation.value;
-          final borderColor = Color.lerp(
-            kBorder,
-            kAccentBlue.withValues(alpha: 0.5),
-            _animation.value,
-          )!;
-
-          return Transform(
-            transform: transform,
+        builder: (context, _) {
+          final t = _animation.value;
+          return Transform.translate(
+            offset: Offset(0, -3 * t),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: widget.onTap,
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  margin: widget.margin,
-                  padding: widget.padding,
+                  width: widget.width,
+                  height: 130,
                   decoration: BoxDecoration(
-                    color: kGlassHighlight.withValues(alpha: opacity),
+                    color: widget.color.withValues(alpha: 0.15 + 0.08 * t),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: borderColor),
-                    boxShadow: _animation.value > 0
-                        ? [
-                            BoxShadow(
-                              color: kAccentBlue.withValues(
-                                alpha: 0.08 * _animation.value,
-                              ),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : [],
+                    border: Border.all(
+                      color: widget.color.withValues(alpha: 0.3 + 0.2 * t),
+                    ),
                   ),
-                  child: widget.child,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(widget.icon, color: widget.color, size: 32),
+                      const SizedBox(height: 10),
+                      Text(
+                        widget.label,
+                        style: const TextStyle(
+                          color: kTextPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           );
         },
-        child: widget.child,
       ),
     );
   }
 }
 
-class _CreateProjectRow extends StatelessWidget {
-  const _CreateProjectRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
+class _RecentProjectsGrid extends StatelessWidget {
+  const _RecentProjectsGrid({required this.projects});
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
+  final List<RecentProject> projects;
 
   @override
   Widget build(BuildContext context) {
-    return _HoverableCard(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon, color: kAccentBlue, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: kTextPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: kTextMuted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          if (onTap != null)
-            const Icon(Icons.arrow_forward, color: kTextSecondary, size: 18),
-        ],
-      ),
-    );
-  }
-}
-
-class _OpenProjectsCard extends StatelessWidget {
-  const _OpenProjectsCard({
-    this.activeWorkspaceTitle,
-    this.onResumeActiveWorkspace,
-  });
-
-  final String? activeWorkspaceTitle;
-  final VoidCallback? onResumeActiveWorkspace;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeTitle = activeWorkspaceTitle;
-    return DashboardCard(
-      title: 'Open Projects',
-      trailing: const Icon(Icons.open_in_new, color: kTextSecondary, size: 18),
-      child: Column(
-        children: [
-          if (activeTitle != null) ...[
-            const _SectionLabel('Active'),
-            _ProjectRow(
-              title: activeTitle,
-              subtitle: 'session active',
-              status: 'resume',
-              accent: kAccentBlue,
-              onTap: onResumeActiveWorkspace,
-            ),
-            const SizedBox(height: 12),
-          ],
-          const _SectionLabel('LaTeX'),
-          _ProjectRow(
-            title: 'Thesis Draft',
-            subtitle: 'local',
-            status: 'editing',
-            accent: kAccentBlue,
-          ),
-          SizedBox(height: 12),
-          _SectionLabel('Typst'),
-          _ProjectRow(
-            title: 'Research Notes',
-            subtitle: 'cloud ready',
-            status: 'synced',
-            accent: kSuccessGreen,
-          ),
-          SizedBox(height: 12),
-          _SectionLabel('Mermaid'),
-          _ProjectRow(
-            title: 'Architecture Flow',
-            subtitle: 'shared',
-            status: '2 peers',
-            accent: kAccentAmber,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 2),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            color: kTextMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProjectRow extends StatelessWidget {
-  const _ProjectRow({
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.accent,
-    this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final String status;
-  final Color accent;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _HoverableCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: kTextPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: kTextMuted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            status,
-            style: const TextStyle(color: kTextSecondary, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecentFilesCard extends StatelessWidget {
-  const _RecentFilesCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return DashboardCard(
-      title: 'Recently Edited',
-      child: Column(
-        children: const [
-          _RecentFileRow(name: 'main.tex', project: 'Thesis Draft'),
-          _RecentFileRow(name: 'outline.typ', project: 'Research Notes'),
-          _RecentFileRow(name: 'system.mmd', project: 'Architecture Flow'),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecentFileRow extends StatefulWidget {
-  const _RecentFileRow({required this.name, required this.project});
-
-  final String name;
-  final String project;
-
-  @override
-  State<_RecentFileRow> createState() => _RecentFileRowState();
-}
-
-class _RecentFileRowState extends State<_RecentFileRow> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+    if (projects.isEmpty) {
+      return Container(
+        height: 120,
         decoration: BoxDecoration(
-          color: _isHovered
-              ? kGlassHighlight.withValues(alpha: 0.3)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: kGlassHighlight.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(14),
         ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.insert_drive_file_outlined,
-              color: _isHovered ? kAccentBlue : kTextSecondary,
-              size: 18,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                widget.name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: _isHovered ? kTextPrimary : kTextSecondary,
-                  fontWeight: _isHovered ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ),
-            Text(
-              widget.project,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: kTextMuted, fontSize: 12),
-            ),
-          ],
+        child: const Center(
+          child: Text(
+            'No hay proyectos recientes',
+            style: TextStyle(color: kTextMuted, fontSize: 14),
+          ),
         ),
-      ),
+      );
+    }
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        for (final project in projects)
+          _RecentProjectCard(project: project),
+      ],
     );
   }
 }
 
-class _CollaborationCard extends StatelessWidget {
-  const _CollaborationCard({
-    required this.onOpenLocalCollaboration,
+class _RecentProjectCard extends StatelessWidget {
+  const _RecentProjectCard({required this.project});
+
+  final RecentProject project;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colorForType(project.type);
+    final icon = _iconForType(project.type);
+    return SizedBox(
+      width: 160,
+      height: 100,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withValues(alpha: 0.2)),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: color, size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        project.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: kTextPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  project.type,
+                  style: TextStyle(color: color, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _colorForType(String type) => switch (type) {
+        'latex' => kAccentBlue,
+        'typst' => kSuccessGreen,
+        'mermaid' => kAccentAmber,
+        _ => const Color(0xFF5A6570),
+      };
+
+  IconData _iconForType(String type) => switch (type) {
+        'latex' => Icons.functions,
+        'typst' => Icons.description_outlined,
+        'mermaid' => Icons.account_tree_outlined,
+        _ => Icons.folder_outlined,
+      };
+}
+
+class _CollaborationPanel extends StatelessWidget {
+  const _CollaborationPanel({
+    required this.recentProjects,
     required this.onJoinSharedWorkspace,
   });
 
-  final VoidCallback onOpenLocalCollaboration;
+  final List<RecentProject> recentProjects;
   final Future<bool> Function(String invite) onJoinSharedWorkspace;
 
-  Future<void> _joinSharedWorkspace(BuildContext context) async {
+  Future<void> _joinWorkspace(BuildContext context) async {
     final invite = await showDialog<String>(
       context: context,
       builder: (context) => const _JoinSharedWorkspaceDialog(),
@@ -798,33 +483,155 @@ class _CollaborationCard extends StatelessWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return DashboardCard(
-      title: 'Collaboration',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _PeerRow(name: 'Local instance', detail: 'current window'),
-          _PeerRow(
-            name: 'Join shared workspace',
-            detail: 'paste an invite from another editor',
-            onTap: () => _joinSharedWorkspace(context),
+  void _createWorkspace(BuildContext context) {
+    if (recentProjects.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF22262E),
+          title: const Text(
+            'No hay proyectos recientes',
+            style: TextStyle(color: kTextPrimary),
           ),
-          _PeerRow(
-            name: 'Second perspective',
-            detail: 'open local realtime test',
-            onTap: onOpenLocalCollaboration,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Open a local two-perspective session to test realtime edits, remote cursors and selections before networking.',
-            style: TextStyle(color: kTextSecondary, height: 1.35),
-          ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => _PickRecentForSharingDialog(
+        projects: recentProjects,
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Colaboración',
+          style: TextStyle(
+            color: kTextPrimary,
+            fontSize: 35,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _joinWorkspace(context),
+            icon: const Icon(Icons.link, size: 18),
+            label: const Text('Unirse'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: kTextPrimary,
+              side: const BorderSide(color: kTextMuted),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => _createWorkspace(context),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Crear'),
+            style: FilledButton.styleFrom(
+              backgroundColor: kAccentBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PickRecentForSharingDialog extends StatelessWidget {
+  const _PickRecentForSharingDialog({required this.projects});
+
+  final List<RecentProject> projects;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF22262E),
+      title: const Text(
+        'Elige un proyecto',
+        style: TextStyle(color: kTextPrimary),
+      ),
+      content: SizedBox(
+        width: 360,
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: projects.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final project = projects[index];
+            return ListTile(
+              leading: Icon(
+                _iconForType(project.type),
+                color: _colorForType(project.type),
+              ),
+              title: Text(
+                project.name,
+                style: const TextStyle(color: kTextPrimary),
+              ),
+              subtitle: Text(
+                project.type,
+                style: const TextStyle(color: kTextMuted),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Compartir no implementado aun'),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+      ],
+    );
+  }
+
+  Color _colorForType(String type) => switch (type) {
+        'latex' => kAccentBlue,
+        'typst' => kSuccessGreen,
+        'mermaid' => kAccentAmber,
+        _ => const Color(0xFF5A6570),
+      };
+
+  IconData _iconForType(String type) => switch (type) {
+        'latex' => Icons.functions,
+        'typst' => Icons.description_outlined,
+        'mermaid' => Icons.account_tree_outlined,
+        _ => Icons.folder_outlined,
+      };
 }
 
 class _JoinSharedWorkspaceDialog extends StatefulWidget {
@@ -854,7 +661,11 @@ class _JoinSharedWorkspaceDialogState
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Join shared workspace'),
+      backgroundColor: const Color(0xFF22262E),
+      title: const Text(
+        'Join shared workspace',
+        style: TextStyle(color: kTextPrimary),
+      ),
       content: SizedBox(
         width: 520,
         child: TextField(
@@ -862,10 +673,16 @@ class _JoinSharedWorkspaceDialogState
           autofocus: true,
           minLines: 3,
           maxLines: 5,
+          style: const TextStyle(color: kTextPrimary),
           decoration: const InputDecoration(
             labelText: 'Invite',
+            labelStyle: TextStyle(color: kTextMuted),
             hintText: 'Paste collaboration invite',
+            hintStyle: TextStyle(color: kTextMuted),
             border: OutlineInputBorder(),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: kTextMuted),
+            ),
           ),
         ),
       ),
@@ -884,89 +701,6 @@ class _JoinSharedWorkspaceDialogState
           label: const Text('Join'),
         ),
       ],
-    );
-  }
-}
-
-class _PeerRow extends StatefulWidget {
-  const _PeerRow({required this.name, required this.detail, this.onTap});
-
-  final String name;
-  final String detail;
-  final VoidCallback? onTap;
-
-  @override
-  State<_PeerRow> createState() => _PeerRowState();
-}
-
-class _PeerRowState extends State<_PeerRow> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _isHovered
-                  ? kGlassHighlight.withValues(alpha: 0.3)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: _isHovered
-                      ? kAccentBlue.withValues(alpha: 0.15)
-                      : kGlassHighlight,
-                  child: Icon(
-                    Icons.person_outline,
-                    color: _isHovered ? kAccentBlue : kTextSecondary,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _isHovered ? kTextPrimary : kTextSecondary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        widget.detail,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: kTextMuted, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                if (widget.onTap != null)
-                  const Icon(
-                    Icons.arrow_forward,
-                    color: kTextSecondary,
-                    size: 16,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
