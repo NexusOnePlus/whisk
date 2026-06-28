@@ -622,8 +622,9 @@ class _EditorStackState extends State<_EditorStack> {
       return KeyEventResult.handled;
     }
 
-    // Character input
-    if (event.character != null && !isCtrl && !isAlt) {
+    // Character input (allow AltGr = Ctrl+Alt on Latin American keyboards)
+    final isAltGr = isCtrl && isAlt;
+    if (event.character != null && ((!isCtrl && !isAlt) || isAltGr)) {
       final ch = event.character!;
       if (ch.isNotEmpty && ch.codeUnitAt(0) >= 32) {
         _insertText(ch);
