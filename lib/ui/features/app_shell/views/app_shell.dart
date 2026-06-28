@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:whisk/ui/features/app_shell/view_models/app_shell_view_model.dart';
+import 'package:whisk/ui/features/app_shell/widgets/about_dialog.dart';
 import 'package:whisk/ui/features/dashboard/views/dashboard_screen.dart';
 import 'package:whisk/ui/features/workspace/views/workspace_screen.dart';
 
@@ -45,6 +46,10 @@ class _AppShellState extends State<AppShell> {
             onTogglePin: viewModel.togglePinProject,
             openProjects: viewModel.openProjectPaths,
             onSwitchProject: viewModel.switchToProject,
+            onAbout: () => showDialog(
+              context: context,
+              builder: (_) => const AboutDialog(),
+            ),
           ),
           AppShellMode.workspace => WorkspaceScreen(
             viewModel: viewModel.workspaceViewModel!,
@@ -54,6 +59,10 @@ class _AppShellState extends State<AppShell> {
             onCloseProject: viewModel.closeAndRemoveWorkspace,
             onTogglePin: viewModel.togglePinProject,
             onSwitchProject: viewModel.switchToProject,
+            onAbout: () => showDialog(
+              context: context,
+              builder: (_) => const AboutDialog(),
+            ),
           ),
           AppShellMode.localCollaboration => _LocalCollaborationWorkspace(
             viewModel: viewModel,

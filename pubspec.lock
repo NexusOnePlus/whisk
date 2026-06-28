@@ -290,6 +290,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  functional_data:
+    dependency: transitive
+    description:
+      name: functional_data
+      sha256: "76d17dc707c40e552014f5a49c0afcc3f1e3f05e800cd6b7872940bfe41a5039"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.0"
   glob:
     dependency: transitive
     description:
@@ -367,6 +375,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.1"
+  json2yaml:
+    dependency: transitive
+    description:
+      name: json2yaml
+      sha256: da94630fbc56079426fdd167ae58373286f603371075b69bf46d848d63ba3e51
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.1"
   json_annotation:
     dependency: transitive
     description:
@@ -599,6 +615,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.2"
+  plain_optional:
+    dependency: transitive
+    description:
+      name: plain_optional
+      sha256: e5856f4c3e5a5e5f47e9c3d13ccbb674d822f95c408869a19ee9a4391cc2e820
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   platform:
     dependency: transitive
     description:
@@ -655,6 +679,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
+  pubspec_yaml:
+    dependency: "direct main"
+    description:
+      name: pubspec_yaml
+      sha256: "312424c243f98a74b912c028cbedb4776a47f80bf7d8b8791291c4486dc3f02a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.0"
   record_use:
     dependency: transitive
     description:
@@ -803,6 +835,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  sum_types:
+    dependency: transitive
+    description:
+      name: sum_types
+      sha256: c0a0fad9a518d011987e1d9f27fc336194294e55dafdc3699363e52aa5776e09
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.5"
   sync_http:
     dependency: transitive
     description:
@@ -852,7 +892,7 @@ packages:
     source: hosted
     version: "1.4.0"
   url_launcher:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: url_launcher
       sha256: f6a7e5c4835bb4e3026a04793a4199ca2d14c739ec378fdfe23fc8075d0439f8
@@ -1028,7 +1068,7 @@ packages:
     source: hosted
     version: "6.6.1"
   yaml:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: yaml
       sha256: b9da305ac7c39faa3f030eccd175340f968459dae4af175130b3fc47e40d76ce

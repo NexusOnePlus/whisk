@@ -8,12 +8,14 @@ class EditorNavbar extends StatelessWidget {
     this.onCreateInvite,
     this.onJoinInvite,
     this.onImportFile,
+    this.onAbout,
   });
 
   final VoidCallback onCloseWorkspace;
   final VoidCallback? onCreateInvite;
   final VoidCallback? onJoinInvite;
   final VoidCallback? onImportFile;
+  final VoidCallback? onAbout;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +48,7 @@ class EditorNavbar extends StatelessWidget {
               _NavBarMenuItem(
                 icon: Icons.info_outline,
                 label: 'About Whisk',
-                onTap: () {},
+                onTap: onAbout,
               ),
             ],
           ),

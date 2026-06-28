@@ -24,6 +24,7 @@ class DashboardScreen extends StatefulWidget {
     this.onTogglePin,
     this.openProjects = const [],
     this.onSwitchProject,
+    this.onAbout,
   });
 
   final List<RecentProject> recentProjects;
@@ -39,6 +40,7 @@ class DashboardScreen extends StatefulWidget {
   final ValueChanged<String>? onTogglePin;
   final List<String> openProjects;
   final ValueChanged<String>? onSwitchProject;
+  final VoidCallback? onAbout;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -103,7 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     padding: const EdgeInsets.all(12),
                     child: Column(
                       children: [
-                        _NavbarFrame(),
+                        _NavbarFrame(onAbout: widget.onAbout),
                         const SizedBox(height: 6),
                         Expanded(child: _ContentFrame(dashboard: this)),
                       ],
@@ -120,61 +122,129 @@ class _DashboardScreenState extends State<DashboardScreen>
 }
 
 class _NavbarFrame extends StatelessWidget {
-  const _NavbarFrame();
+  const _NavbarFrame({this.onAbout});
+
+  final VoidCallback? onAbout;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 52,
-      child: GlassPanel(
-        borderRadius: 16,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Icon(Icons.search_rounded, color: kTextMuted, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
+      child: Row(
+        children: [
+          _NavBarDropdown(
+            label: 'About',
+            items: [
+              _NavBarMenuItem(
+                icon: Icons.info_outline,
+                label: 'About Whisk',
+                onTap: onAbout,
+              ),
+            ],
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.center,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Row(
+                  children: [
+                    Icon(Icons.search_rounded, color: kTextMuted, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        style: const TextStyle(
+                          color: kTextPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar proyectos, comandos...',
+                          hintStyle: TextStyle(
+                            color: kTextMuted,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'Buscar proyectos, comandos...',
-                  hintStyle: TextStyle(
-                    color: kTextMuted,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavBarDropdown extends StatelessWidget {
+  const _NavBarDropdown({required this.label, required this.items});
+
+  final String label;
+  final List<_NavBarMenuItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_NavBarMenuItem>(
+      onSelected: (item) => item.onTap?.call(),
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: kBorder),
+      ),
+      color: const Color(0xFF22262E),
+      itemBuilder: (context) => items
+          .map(
+            (item) => PopupMenuItem<_NavBarMenuItem>(
+              value: item,
+              height: 36,
+              child: Row(
+                children: [
+                  Icon(item.icon, size: 16, color: kTextSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    item.label,
+                    style: const TextStyle(color: kTextPrimary, fontSize: 13),
                   ),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
-                ),
+                ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: kGlassHighlight,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: kBorder),
-              ),
-              child: const Text(
-                '\u2318K',
-                style: TextStyle(
-                  color: kTextMuted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+          )
+          .toList(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: kTextSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
             ),
+            const SizedBox(width: 2),
+            const Icon(Icons.expand_more, size: 16, color: kTextMuted),
           ],
         ),
       ),
     );
   }
+}
+
+class _NavBarMenuItem {
+  const _NavBarMenuItem({required this.icon, required this.label, this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
 }
 
 class _ContentFrame extends StatelessWidget {

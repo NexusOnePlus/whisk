@@ -19,6 +19,9 @@ dependencies:
   http: ^1.6.0
   archive: ^4.0.9
   watcher: ^1.2.1
+  yaml: ^3.1.2
+  pubspec_yaml: ^3.1.0
+  url_launcher: ^6.2.5
   rust_lib_whisk:
     path: rust_builder
   flutter_rust_bridge: 2.12.0
