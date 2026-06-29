@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/app_shell/view_models/app_shell_view_model.dart';
 import 'package:whisk/ui/features/app_shell/widgets/about_dialog.dart' as whisk;
-import 'package:whisk/ui/features/dashboard/views/dashboard_screen.dart';
-import 'package:whisk/ui/features/projects/views/projects_screen.dart';
-import 'package:whisk/ui/features/workspace/views/workspace_screen.dart';
+import 'package:whisk/ui/features/app_shell/widgets/app_sidebar.dart';
+import 'package:whisk/ui/features/dashboard/views/dashboard_content.dart';
+import 'package:whisk/ui/features/workspace/views/workspace_content.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -15,6 +15,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   late final AppShellViewModel viewModel;
+  final _sidebarKey = GlobalKey<AppSidebarState>();
 
   @override
   void initState() {
@@ -33,94 +34,85 @@ class _AppShellState extends State<AppShell> {
     return ListenableBuilder(
       listenable: viewModel,
       builder: (context, _) {
-        final content = switch (viewModel.mode) {
-          AppShellMode.dashboard => DashboardScreen(
-            recentProjects: viewModel.recentProjects,
-            onOpenDraftWorkspace: (int i) => viewModel.openDraftWorkspace(i),
-            onOpenProject: viewModel.openProject,
-            onOpenRecentProject: viewModel.openRecentProject,
-            onRemoveRecentProject: viewModel.removeRecentProject,
-            onOpenLocalCollaboration: viewModel.openLocalCollaborationDemo,
-            onJoinSharedWorkspace: viewModel.joinSharedWorkspace,
-            activeWorkspaceTitle: viewModel.activeWorkspaceTitle,
-            onResumeActiveWorkspace: viewModel.resumeActiveWorkspace,
-            pinnedProjects: viewModel.pinnedProjects,
-            onTogglePin: viewModel.togglePinProject,
-            openProjects: viewModel.openProjectPaths,
-            onSwitchProject: viewModel.switchToProject,
-            onAbout: () => showDialog(
-              context: context,
-              builder: (_) => const whisk.WhiskAboutDialog(),
-            ),
-          ),
-          AppShellMode.workspace => WorkspaceScreen(
-            viewModel: viewModel.workspaceViewModel!,
-            onCloseWorkspace: viewModel.closeWorkspace,
-            openProjects: viewModel.openProjectPaths,
-            pinnedProjects: viewModel.pinnedProjects,
-            onCloseProject: viewModel.closeAndRemoveWorkspace,
-            onTogglePin: viewModel.togglePinProject,
-            onSwitchProject: viewModel.switchToProject,
-            onProjects: viewModel.showProjects,
-            onAbout: () => showDialog(
-              context: context,
-              builder: (_) => const whisk.WhiskAboutDialog(),
-            ),
-          ),
-          AppShellMode.projects => ProjectsScreen(
-            openProjects: viewModel.openProjectPaths,
-            pinnedProjects: viewModel.pinnedProjects,
-            activeProjectTitle: viewModel.activeWorkspaceTitle,
-            onSwitchProject: viewModel.switchToProject,
-            onTogglePin: viewModel.togglePinProject,
-            onBackToWorkspace: viewModel.resumeFromProjects,
-            onAbout: () => showDialog(
-              context: context,
-              builder: (_) => const whisk.WhiskAboutDialog(),
-            ),
-          ),
-          AppShellMode.localCollaboration => _LocalCollaborationWorkspace(
-            viewModel: viewModel,
-          ),
-        };
+        final isWorkspace = viewModel.mode == AppShellMode.workspace;
 
-        return Stack(
-          children: [
-            content,
-            if (viewModel.isJoining)
-              Container(
-                color: kAppBlack.withValues(alpha: 0.8),
-                child: const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        color: kAccentBlue,
-                        strokeWidth: 2,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Joining session...',
-                        style: TextStyle(
-                          color: kTextSecondary,
-                          fontSize: 14,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Syncing project files',
-                        style: TextStyle(
-                          color: kTextMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+        if (isWorkspace) {
+          _sidebarKey.currentState?.setWorkspaceMode(true);
+        } else {
+          _sidebarKey.currentState?.setWorkspaceMode(false);
+        }
+
+        return Scaffold(
+          backgroundColor: kAppBlack,
+          body: SafeArea(
+            child: Row(
+              children: [
+                AppSidebar(
+                  key: _sidebarKey,
+                  activeProjectTitle: viewModel.activeWorkspaceTitle,
+                  openProjects: viewModel.openProjectPaths,
+                  pinnedProjects: viewModel.pinnedProjects,
+                  recentProjects: viewModel.recentProjects,
+                  onSwitchProject: viewModel.switchToProject,
+                  onTogglePin: viewModel.togglePinProject,
+                  onCloseProject: viewModel.closeAndRemoveWorkspace,
+                  onOpenRecentProject: viewModel.openRecentProject,
+                  onRemoveRecentProject: viewModel.removeRecentProject,
+                  onOpenDraftWorkspace: (int i) => viewModel.openDraftWorkspace(i),
+                  onOpenFolder: viewModel.openProject,
+                  onJoinSharedWorkspace: viewModel.joinSharedWorkspace,
+                  onAbout: _showAbout,
                 ),
-              ),
-          ],
+                Container(width: 1, color: kBorder),
+                Expanded(
+                  child: _buildContent(isWorkspace),
+                ),
+              ],
+            ),
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildContent(bool isWorkspace) {
+    if (isWorkspace) {
+      return WorkspaceContent(
+        viewModel: viewModel.workspaceViewModel!,
+        onCloseWorkspace: viewModel.closeWorkspace,
+        openProjects: viewModel.openProjectPaths,
+        pinnedProjects: viewModel.pinnedProjects,
+        onCloseProject: viewModel.closeAndRemoveWorkspace,
+        onTogglePin: viewModel.togglePinProject,
+        onSwitchProject: viewModel.switchToProject,
+        onAbout: _showAbout,
+      );
+    }
+
+    if (viewModel.mode == AppShellMode.localCollaboration) {
+      return _LocalCollaborationWorkspace(viewModel: viewModel);
+    }
+
+    return DashboardContent(
+      recentProjects: viewModel.recentProjects,
+      onOpenDraftWorkspace: (int i) => viewModel.openDraftWorkspace(i),
+      onOpenProject: viewModel.openProject,
+      onOpenRecentProject: viewModel.openRecentProject,
+      onRemoveRecentProject: viewModel.removeRecentProject,
+      onOpenLocalCollaboration: viewModel.openLocalCollaborationDemo,
+      onJoinSharedWorkspace: viewModel.joinSharedWorkspace,
+      pinnedProjects: viewModel.pinnedProjects,
+      onTogglePin: viewModel.togglePinProject,
+      openProjects: viewModel.openProjectPaths,
+      onSwitchProject: viewModel.switchToProject,
+      onAbout: _showAbout,
+    );
+  }
+
+  void _showAbout() {
+    showDialog(
+      context: context,
+      builder: (_) => const whisk.WhiskAboutDialog(),
     );
   }
 }
@@ -146,29 +138,12 @@ class _LocalCollaborationWorkspace extends StatelessWidget {
             children: [
               for (final workspace in workspaces) ...[
                 Expanded(
-                  child: Column(
-                    children: [
-                      _LocalPerspectiveHeader(
-                        title:
-                            'Perspective ${workspaces.indexOf(workspace) + 1}',
-                        canRemove: workspaces.length > 1,
-                        onRemove: () {
-                          viewModel.removeLocalCollaborationPerspective(
-                            workspace,
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: WorkspaceScreen(
-                          viewModel: workspace,
-                          onCloseWorkspace: viewModel.closeWorkspace,
-                          openProjects: viewModel.openProjectPaths,
-                          pinnedProjects: viewModel.pinnedProjects,
-                          onTogglePin: viewModel.togglePinProject,
-                        ),
-                      ),
-                    ],
+                  child: WorkspaceContent(
+                    viewModel: workspace,
+                    onCloseWorkspace: viewModel.closeWorkspace,
+                    openProjects: viewModel.openProjectPaths,
+                    pinnedProjects: viewModel.pinnedProjects,
+                    onTogglePin: viewModel.togglePinProject,
                   ),
                 ),
                 if (workspace != workspaces.last)
@@ -220,47 +195,6 @@ class _LocalCollaborationToolbar extends StatelessWidget {
           IconButton(
             tooltip: 'Close demo',
             onPressed: onCloseWorkspace,
-            icon: const Icon(Icons.close),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LocalPerspectiveHeader extends StatelessWidget {
-  const _LocalPerspectiveHeader({
-    required this.title,
-    required this.canRemove,
-    required this.onRemove,
-  });
-
-  final String title;
-  final bool canRemove;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      height: 32,
-      color: theme.colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.only(left: 10, right: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Remove perspective',
-            onPressed: canRemove ? onRemove : null,
-            iconSize: 18,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
             icon: const Icon(Icons.close),
           ),
         ],

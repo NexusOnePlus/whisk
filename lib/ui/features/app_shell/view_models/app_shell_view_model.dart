@@ -14,7 +14,7 @@ import 'package:whisk/domain/models/recent_project.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
 
-enum AppShellMode { dashboard, workspace, localCollaboration, projects }
+enum AppShellMode { dashboard, workspace, localCollaboration }
 
 class AppShellViewModel extends ChangeNotifier {
   AppShellViewModel({this._projectOpenService = const ProjectOpenService()}) {
