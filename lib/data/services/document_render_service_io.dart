@@ -278,8 +278,15 @@ class DocumentRenderService {
     final env = <String, String>{
       'WHISK_CACHE_DIR': cacheRoot.path,
       'TYPST_PACKAGE_CACHE': '${cacheRoot.path}${Platform.pathSeparator}typst',
-      'FONTCONFIG_FILE': '',
     };
+
+    final fontconfigFile = File('${cacheRoot.path}${Platform.pathSeparator}fontconfig.conf');
+    if (!await fontconfigFile.exists()) {
+      await fontconfigFile.writeAsString(
+        '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts:dtd:config:1.0">\n<fontconfig/>\n',
+      );
+    }
+    env['FONTCONFIG_FILE'] = fontconfigFile.path;
     if (engine == 'latex') {
       env.addAll({
         'TEXMFVAR': '${cacheRoot.path}${Platform.pathSeparator}texmf-var',
