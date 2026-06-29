@@ -2,7 +2,7 @@ name: whisk
 description: "Multi-environment authoring workspace for documents, diagrams and technical writing."
 publish_to: 'none'
 
-version: 0.0.3
+version: 0.0.4
 
 environment:
   sdk: ^3.12.0
