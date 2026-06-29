@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:whisk/data/services/collection_service.dart';
 import 'package:whisk/data/services/project_tags_service.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
@@ -11,6 +12,7 @@ class ProjectsContent extends StatefulWidget {
     super.key,
     required this.openProjects,
     required this.pinnedProjects,
+    required this.recentProjects,
     this.activeProjectTitle,
     this.onSwitchProject,
     this.onTogglePin,
@@ -18,6 +20,7 @@ class ProjectsContent extends StatefulWidget {
 
   final List<String> openProjects;
   final List<String> pinnedProjects;
+  final List<String> recentProjects;
   final String? activeProjectTitle;
   final ValueChanged<String>? onSwitchProject;
   final ValueChanged<String>? onTogglePin;
@@ -31,19 +34,71 @@ class _ProjectsContentState extends State<ProjectsContent> {
   String? _tagFilter;
   SortMode _sort = SortMode.name;
   final _tagsService = ProjectTagsService.instance;
+  final _collectionService = CollectionService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _tagsService.load();
+    _collectionService.load();
+    _collectionService.addListener(_onCollectionsChanged);
+  }
+
+  @override
+  void dispose() {
+    _collectionService.removeListener(_onCollectionsChanged);
+    super.dispose();
+  }
+
+  void _onCollectionsChanged() => setState(() {});
 
   List<String> get _allProjects {
-    final all = <String>{...widget.pinnedProjects, ...widget.openProjects}.toList();
+    final all = <String>{
+      ...widget.pinnedProjects,
+      ...widget.openProjects,
+      ...widget.recentProjects,
+    }.toList();
     switch (_sort) {
       case SortMode.name:
         all.sort();
       case SortMode.type:
         all.sort((a, b) => _typeOf(a).compareTo(_typeOf(b)));
       case SortMode.pinned:
-        return [...widget.pinnedProjects, ...widget.openProjects.where((p) => !widget.pinnedProjects.contains(p))];
+        return [
+          ...widget.pinnedProjects,
+          ...all.where((p) => !widget.pinnedProjects.contains(p)),
+        ];
     }
     return all;
   }
+
+  List<String> _applyFilter(List<String> projects) {
+    var result = projects;
+    if (_filter.isNotEmpty) {
+      result = result.where((p) {
+        final name = p.split(Platform.pathSeparator).last.toLowerCase();
+        return name.contains(_filter.toLowerCase());
+      }).toList();
+    }
+    if (_tagFilter != null) {
+      result = result.where((p) {
+        final tags = _tagsService.tagsFor(p);
+        return tags.contains(_tagFilter);
+      }).toList();
+    }
+    return result;
+  }
+
+  List<String> get _unsortedProjects {
+    final inCollection = <String>{
+      for (final c in _collectionService.collections) ...c.projects,
+    };
+    return _applyFilter(
+      _allProjects.where((p) => !inCollection.contains(p)).toList(),
+    );
+  }
+
+  List<String> get _allTags => _tagsService.allTags;
 
   String _typeOf(String path) {
     final name = path.split(Platform.pathSeparator).last.toLowerCase();
@@ -53,29 +108,136 @@ class _ProjectsContentState extends State<ProjectsContent> {
     return 'other';
   }
 
-  List<String> get _allTags => _tagsService.allTags;
-
-  List<String> get _filteredProjects {
-    var projects = _allProjects;
-    if (_filter.isNotEmpty) {
-      projects = projects.where((p) {
-        final name = p.split(Platform.pathSeparator).last.toLowerCase();
-        return name.contains(_filter.toLowerCase());
-      }).toList();
-    }
-    if (_tagFilter != null) {
-      projects = projects.where((p) {
-        final tags = _tagsService.tagsFor(p);
-        return tags.contains(_tagFilter);
-      }).toList();
-    }
-    return projects;
+  void _showNewCollectionDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF22262E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: kBorder),
+        ),
+        title: const Text(
+          'New Collection',
+          style: TextStyle(color: kTextPrimary, fontSize: 16),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: kTextPrimary),
+          decoration: const InputDecoration(
+            hintText: 'Collection name',
+            hintStyle: TextStyle(color: kTextMuted),
+          ),
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) {
+              _collectionService.addCollection(v.trim());
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel', style: TextStyle(color: kTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                _collectionService.addCollection(controller.text.trim());
+                Navigator.of(context).pop();
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: kAccentBlue),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _tagsService.load();
+  void _showMoveToCollectionDialog(String projectPath) {
+    final collections = _collectionService.collections;
+    final currentCollection = _collectionService.collectionForProject(projectPath);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF22262E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: kBorder),
+        ),
+        title: const Text(
+          'Move to Collection',
+          style: TextStyle(color: kTextPrimary, fontSize: 16),
+        ),
+        content: SizedBox(
+          width: 280,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  Icons.inbox_outlined,
+                  color: currentCollection == null ? kAccentBlue : kTextMuted,
+                  size: 18,
+                ),
+                title: Text(
+                  'Unsorted',
+                  style: TextStyle(
+                    color: currentCollection == null ? kAccentBlue : kTextPrimary,
+                    fontSize: 13,
+                  ),
+                ),
+                onTap: () {
+                  if (currentCollection != null) {
+                    _collectionService.removeFromCollection(
+                      currentCollection,
+                      projectPath,
+                    );
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+              for (final c in collections) ...[
+                const Divider(height: 1, color: kBorder),
+                ListTile(
+                  dense: true,
+                  leading: Icon(
+                    Icons.folder_outlined,
+                    color: currentCollection == c.name ? kAccentBlue : kTextMuted,
+                    size: 18,
+                  ),
+                  title: Text(
+                    c.name,
+                    style: TextStyle(
+                      color: currentCollection == c.name ? kAccentBlue : kTextPrimary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${c.projects.length} projects',
+                    style: const TextStyle(color: kTextMuted, fontSize: 11),
+                  ),
+                  onTap: () {
+                    _collectionService.addToCollection(c.name, projectPath);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel', style: TextStyle(color: kTextMuted)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -85,6 +247,7 @@ class _ProjectsContentState extends State<ProjectsContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               Container(
@@ -106,6 +269,13 @@ class _ProjectsContentState extends State<ProjectsContent> {
                 ),
               ),
               const Spacer(),
+              // New Collection button
+              _PillButton(
+                icon: Icons.create_new_folder_outlined,
+                label: 'New Collection',
+                onTap: _showNewCollectionDialog,
+              ),
+              const SizedBox(width: 10),
               _SortDropdown(
                 value: _sort,
                 onChanged: (v) => setState(() => _sort = v),
@@ -140,6 +310,7 @@ class _ProjectsContentState extends State<ProjectsContent> {
               ),
             ],
           ),
+          // Tags
           if (_allTags.isNotEmpty) ...[
             const SizedBox(height: 16),
             SizedBox(
@@ -168,45 +339,263 @@ class _ProjectsContentState extends State<ProjectsContent> {
             ),
           ],
           const SizedBox(height: 20),
+          // Sections
           Expanded(
-            child: _filteredProjects.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.folder_open, color: kTextMuted.withValues(alpha: 0.4), size: 40),
-                        const SizedBox(height: 12),
-                        Text(
-                          _filter.isNotEmpty || _tagFilter != null
-                              ? 'No matching projects'
-                              : 'No projects yet',
-                          style: const TextStyle(color: kTextMuted, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  )
-                : Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      for (final path in _filteredProjects)
-                        _ProjectThumbnailCard(
-                          path: path,
-                          isPinned: widget.pinnedProjects.contains(path),
-                          tags: _tagsService.tagsFor(path),
-                          onTap: widget.onSwitchProject != null
-                              ? () => widget.onSwitchProject!(path)
-                              : null,
-                          onTogglePin: widget.onTogglePin != null
-                              ? () => widget.onTogglePin!(path)
-                              : null,
-                          onAddTag: (tag) => _tagsService.addTag(path, tag),
-                          onRemoveTag: (tag) => _tagsService.removeTag(path, tag),
-                        ),
-                    ],
+            child: ListView(
+              children: [
+                // Unsorted section
+                _CollectionSection(
+                  title: 'Unsorted',
+                  icon: Icons.inbox_outlined,
+                  projects: _unsortedProjects,
+                  allProjects: _allProjects,
+                  pinnedProjects: widget.pinnedProjects,
+                  tagsService: _tagsService,
+                  onSwitchProject: widget.onSwitchProject,
+                  onTogglePin: widget.onTogglePin,
+                  onMoveToCollection: _showMoveToCollectionDialog,
+                ),
+                // Collection sections
+                for (final collection in _collectionService.collections) ...[
+                  const SizedBox(height: 24),
+                  _CollectionSection(
+                    title: collection.name,
+                    icon: Icons.folder_outlined,
+                    projects: _applyFilter(collection.projects),
+                    allProjects: _allProjects,
+                    pinnedProjects: widget.pinnedProjects,
+                    tagsService: _tagsService,
+                    onSwitchProject: widget.onSwitchProject,
+                    onTogglePin: widget.onTogglePin,
+                    onMoveToCollection: _showMoveToCollectionDialog,
+                    onDeleteCollection: () {
+                      _collectionService.removeCollection(collection.name);
+                    },
+                    onRenameCollection: (newName) {
+                      _collectionService.renameCollection(collection.name, newName);
+                    },
                   ),
+                ],
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CollectionSection extends StatelessWidget {
+  const _CollectionSection({
+    required this.title,
+    required this.icon,
+    required this.projects,
+    required this.allProjects,
+    required this.pinnedProjects,
+    required this.tagsService,
+    this.onSwitchProject,
+    this.onTogglePin,
+    this.onMoveToCollection,
+    this.onDeleteCollection,
+    this.onRenameCollection,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<String> projects;
+  final List<String> allProjects;
+  final List<String> pinnedProjects;
+  final ProjectTagsService tagsService;
+  final ValueChanged<String>? onSwitchProject;
+  final ValueChanged<String>? onTogglePin;
+  final ValueChanged<String>? onMoveToCollection;
+  final VoidCallback? onDeleteCollection;
+  final ValueChanged<String>? onRenameCollection;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section header
+        Row(
+          children: [
+            Icon(icon, size: 16, color: kTextMuted),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                color: kTextPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: kGlassHighlight,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '${projects.length}',
+                style: const TextStyle(color: kTextMuted, fontSize: 10),
+              ),
+            ),
+            const Spacer(),
+            if (onDeleteCollection != null)
+              PopupMenuButton<String>(
+                onSelected: (v) {
+                  if (v == 'delete') onDeleteCollection?.call();
+                  if (v == 'rename') _showRenameDialog(context);
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: const BorderSide(color: kBorder),
+                ),
+                color: const Color(0xFF22262E),
+                child: const Icon(Icons.more_horiz, size: 16, color: kTextMuted),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'rename',
+                    height: 36,
+                    child: Row(children: [
+                      Icon(Icons.edit_outlined, size: 16, color: kTextSecondary),
+                      SizedBox(width: 8),
+                      Text('Rename', style: TextStyle(color: kTextPrimary, fontSize: 13)),
+                    ]),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    height: 36,
+                    child: Row(children: [
+                      Icon(Icons.delete_outline, size: 16, color: kDangerRed),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: kDangerRed, fontSize: 13)),
+                    ]),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Projects grid or empty state
+        if (projects.isEmpty)
+          Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: kGlassHighlight.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kBorder.withValues(alpha: 0.5)),
+            ),
+            child: Center(
+              child: Text(
+                'No projects here',
+                style: TextStyle(color: kTextMuted.withValues(alpha: 0.5), fontSize: 13),
+              ),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final path in projects)
+                _ProjectThumbnailCard(
+                  path: path,
+                  isPinned: pinnedProjects.contains(path),
+                  tags: tagsService.tagsFor(path),
+                  onTap: onSwitchProject != null
+                      ? () => onSwitchProject!(path)
+                      : null,
+                  onTogglePin: onTogglePin != null
+                      ? () => onTogglePin!(path)
+                      : null,
+                  onAddTag: (tag) => tagsService.addTag(path, tag),
+                  onRemoveTag: (tag) => tagsService.removeTag(path, tag),
+                  onMoveToCollection: onMoveToCollection != null
+                      ? () => onMoveToCollection!(path)
+                      : null,
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  void _showRenameDialog(BuildContext context) {
+    final controller = TextEditingController(text: title);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF22262E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: kBorder),
+        ),
+        title: const Text('Rename Collection', style: TextStyle(color: kTextPrimary, fontSize: 16)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: kTextPrimary),
+          decoration: const InputDecoration(hintText: 'Name', hintStyle: TextStyle(color: kTextMuted)),
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) {
+              onRenameCollection?.call(v.trim());
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel', style: TextStyle(color: kTextMuted))),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                onRenameCollection?.call(controller.text.trim());
+                Navigator.of(context).pop();
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: kAccentBlue),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  const _PillButton({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: kAccentBlue.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: kAccentBlue.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: kAccentBlue),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(color: kAccentBlue, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -288,6 +677,7 @@ class _ProjectThumbnailCard extends StatefulWidget {
     this.onTogglePin,
     this.onAddTag,
     this.onRemoveTag,
+    this.onMoveToCollection,
   });
 
   final String path;
@@ -297,6 +687,7 @@ class _ProjectThumbnailCard extends StatefulWidget {
   final VoidCallback? onTogglePin;
   final ValueChanged<String>? onAddTag;
   final ValueChanged<String>? onRemoveTag;
+  final VoidCallback? onMoveToCollection;
 
   @override
   State<_ProjectThumbnailCard> createState() => _ProjectThumbnailCardState();
@@ -462,12 +853,15 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
         PopupMenuItem(value: 'open', height: 36, child: Row(children: [const Icon(Icons.open_in_new, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Open', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
         PopupMenuItem(value: 'pin', height: 36, child: Row(children: [Icon(widget.isPinned ? Icons.push_pin_outlined : Icons.push_pin, size: 16, color: kTextSecondary), const SizedBox(width: 8), Text(widget.isPinned ? 'Unpin' : 'Pin', style: const TextStyle(color: kTextPrimary, fontSize: 13))])),
         PopupMenuItem(value: 'tag', height: 36, child: Row(children: [const Icon(Icons.label_outline, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Add tag', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
+        if (widget.onMoveToCollection != null)
+          PopupMenuItem(value: 'move', height: 36, child: Row(children: [const Icon(Icons.drive_file_move_outlined, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Move to collection', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
       ],
     ).then((value) {
       if (!context.mounted) return;
       if (value == 'open') widget.onTap?.call();
       if (value == 'pin') widget.onTogglePin?.call();
       if (value == 'tag') _showAddTagDialog(context);
+      if (value == 'move') widget.onMoveToCollection?.call();
     });
   }
 

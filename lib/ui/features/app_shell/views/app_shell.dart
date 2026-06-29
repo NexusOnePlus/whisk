@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/app_shell/view_models/app_shell_view_model.dart';
@@ -84,6 +81,7 @@ class _AppShellState extends State<AppShell> {
         return ProjectsContent(
           openProjects: viewModel.openProjectPaths,
           pinnedProjects: viewModel.pinnedProjects,
+          recentProjects: viewModel.recentProjects.map((p) => p.path).toList(),
           activeProjectTitle: viewModel.activeWorkspaceTitle,
           onSwitchProject: viewModel.switchToProject,
           onTogglePin: viewModel.togglePinProject,
