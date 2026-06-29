@@ -15,6 +15,17 @@ class DocumentRenderService {
 
   final EngineProvisionService engineProvisionService;
 
+  static Future<void> _safeWriteFile(File target, String content) async {
+    final temp = File('${target.path}.tmp');
+    await temp.writeAsString(content);
+    try {
+      await temp.rename(target.path);
+    } on FileSystemException {
+      await target.writeAsString(content);
+      try { await temp.delete(); } catch (_) {}
+    }
+  }
+
   Future<RenderResult> render({
     required String environmentId,
     required WhiskFile file,
@@ -34,7 +45,7 @@ class DocumentRenderService {
     final build = workspace.buildRoot;
 
     final source = File(workspace.sourcePath);
-    await source.writeAsString(file.content);
+    await _safeWriteFile(source, file.content);
 
     final tectonic = await engineProvisionService.ensureTectonic();
     final preferredEngine = workspace.config.latexEngine;
@@ -130,7 +141,7 @@ class DocumentRenderService {
     final build = workspace.buildRoot;
 
     final source = File(workspace.sourcePath);
-    await source.writeAsString(file.content);
+    await _safeWriteFile(source, file.content);
 
     final preferredEngine = workspace.config.typstEngine;
     if (preferredEngine != 'auto' && preferredEngine != 'typst') {
