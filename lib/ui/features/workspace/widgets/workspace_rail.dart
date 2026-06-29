@@ -15,6 +15,8 @@ class WorkspaceRail extends StatefulWidget {
     this.onTogglePin,
     this.onHelp,
     this.onShowLogs,
+    this.onHome,
+    this.onProjects,
   });
 
   final String? activeProjectTitle;
@@ -26,6 +28,8 @@ class WorkspaceRail extends StatefulWidget {
   final ValueChanged<String>? onTogglePin;
   final VoidCallback? onHelp;
   final VoidCallback? onShowLogs;
+  final VoidCallback? onHome;
+  final VoidCallback? onProjects;
 
   @override
   State<WorkspaceRail> createState() => _WorkspaceRailState();
@@ -49,12 +53,12 @@ class _WorkspaceRailState extends State<WorkspaceRail> {
               icon: Icons.home_outlined,
               label: 'Home',
               selected: true,
-              onPressed: () {},
+              onPressed: widget.onHome ?? () {},
             ),
             _RailButton(
               icon: Icons.dashboard_outlined,
               label: 'Projects',
-              onPressed: () {},
+              onPressed: widget.onProjects ?? () {},
             ),
             _RailButton(
               icon: Icons.inventory_2_outlined,

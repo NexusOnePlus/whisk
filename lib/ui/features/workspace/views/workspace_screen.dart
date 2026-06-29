@@ -18,6 +18,7 @@ import 'package:whisk/ui/features/workspace/widgets/editor_content_frame.dart';
 import 'package:whisk/ui/features/workspace/widgets/editor_navbar.dart';
 import 'package:whisk/ui/features/workspace/widgets/join_invite_dialog.dart';
 import 'package:whisk/ui/features/workspace/widgets/log_viewer_dialog.dart';
+import 'package:whisk/ui/features/workspace/widgets/projects_panel.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -261,6 +262,18 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     );
   }
 
+  void _showProjects() {
+    showDialog(
+      context: context,
+      builder: (context) => ProjectsPanel(
+        openProjects: widget.openProjects,
+        pinnedProjects: widget.pinnedProjects,
+        onSwitchProject: widget.onSwitchProject,
+        onTogglePin: widget.onTogglePin,
+      ),
+    );
+  }
+
   bool get _canExportPdf {
     final envId = viewModel.selectedEnvironment.id;
     return envId == 'latex' || envId == 'typst';
@@ -428,6 +441,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                           onTogglePin: widget.onTogglePin,
                           onSwitchProject: widget.onSwitchProject,
                           onShowLogs: _showLogs,
+                          onHome: widget.onCloseWorkspace,
+                          onProjects: _showProjects,
                         ),
                         Expanded(
                           child: Padding(
