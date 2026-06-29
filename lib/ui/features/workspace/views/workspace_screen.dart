@@ -157,14 +157,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       );
       _flushPendingContent();
     });
-    _renderDebounce?.cancel();
-    _renderDebounce = Timer(const Duration(milliseconds: 800), () {
-      LogBuffer.writeln(
-        LogCategory.render,
-        '[${DateTime.now().toString().substring(11, 19)}] 800ms debounce fired - calling renderActiveFile',
-      );
-      if (mounted) viewModel.renderActiveFile();
-    });
+    if (!SettingsService.instance.renderOnSaveOnly) {
+      _renderDebounce?.cancel();
+      _renderDebounce = Timer(const Duration(milliseconds: 800), () {
+        LogBuffer.writeln(
+          LogCategory.render,
+          '[${DateTime.now().toString().substring(11, 19)}] 800ms debounce fired - calling renderActiveFile',
+        );
+        if (mounted) viewModel.renderActiveFile();
+      });
+    }
   }
 
   void _handleLocalTextOperations(List<EditorTextOperation> operations) {

@@ -123,6 +123,7 @@ class _WorkspaceContentState extends State<WorkspaceContent>
 
   void _handleEditorChanged(String content) {
     viewModel.updateActiveContent(content);
+    if (SettingsService.instance.renderOnSaveOnly) return;
     _renderDebounce?.cancel();
     _renderDebounce = Timer(const Duration(milliseconds: 800), () {
       if (mounted) viewModel.renderActiveFile();

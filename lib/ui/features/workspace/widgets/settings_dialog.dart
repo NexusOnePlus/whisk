@@ -11,12 +11,14 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   late final TextEditingController _nameController;
+  late bool _renderOnSaveOnly;
   final _service = SettingsService.instance;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: _service.profileName);
+    _renderOnSaveOnly = _service.renderOnSaveOnly;
   }
 
   @override
@@ -84,7 +86,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
                 filled: true,
                 fillColor: kGlassHighlight,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: kBorder),
@@ -98,7 +103,47 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   borderSide: const BorderSide(color: kAccentBlue),
                 ),
               ),
-              onSubmitted: (_) => _saveProfileName(),
+              onSubmitted: (_) => _saveAndClose(),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Render',
+              style: TextStyle(
+                color: kTextMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Only render on save',
+                        style: TextStyle(color: kTextPrimary, fontSize: 13),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Disable automatic render while typing. Useful for large documents.',
+                        style: TextStyle(color: kTextSecondary, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _renderOnSaveOnly,
+                  activeColor: kAccentBlue,
+                  onChanged: (val) {
+                    setState(() {
+                      _renderOnSaveOnly = val;
+                    });
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -109,7 +154,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           child: const Text('Cancel', style: TextStyle(color: kTextMuted)),
         ),
         FilledButton(
-          onPressed: _saveProfileName,
+          onPressed: _saveAndClose,
           style: FilledButton.styleFrom(
             backgroundColor: kAccentBlue,
             shape: RoundedRectangleBorder(
@@ -122,8 +167,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
     );
   }
 
-  void _saveProfileName() {
+  void _saveAndClose() {
     _service.setProfileName(_nameController.text.trim());
+    _service.setRenderOnSaveOnly(_renderOnSaveOnly);
     Navigator.of(context).pop();
   }
 }

@@ -12,10 +12,12 @@ class SettingsService extends ChangeNotifier {
   static SettingsService get instance => _instance ??= SettingsService._();
 
   String _profileName = '';
+  bool _renderOnSaveOnly = false;
   bool _loaded = false;
   final Map<String, List<String>> _projectTags = {};
 
   String get profileName => _profileName;
+  bool get renderOnSaveOnly => _renderOnSaveOnly;
   bool get loaded => _loaded;
   Map<String, List<String>> get projectTags => Map.unmodifiable(_projectTags);
 
@@ -36,8 +38,10 @@ class SettingsService extends ChangeNotifier {
       final dir = await _appSettingsDir();
       final file = File('${dir.path}${Platform.pathSeparator}settings.json');
       if (await file.exists()) {
-        final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        final data =
+            jsonDecode(await file.readAsString()) as Map<String, dynamic>;
         _profileName = data['profileName'] as String? ?? '';
+        _renderOnSaveOnly = data['renderOnSaveOnly'] as bool? ?? false;
         final tags = data['projectTags'] as Map<String, dynamic>?;
         if (tags != null) {
           for (final entry in tags.entries) {
@@ -54,6 +58,12 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> setProfileName(String name) async {
     _profileName = name;
+    notifyListeners();
+    await _save();
+  }
+
+  Future<void> setRenderOnSaveOnly(bool value) async {
+    _renderOnSaveOnly = value;
     notifyListeners();
     await _save();
   }
@@ -80,10 +90,13 @@ class SettingsService extends ChangeNotifier {
     try {
       final dir = await _appSettingsDir();
       final file = File('${dir.path}${Platform.pathSeparator}settings.json');
-      await file.writeAsString(jsonEncode({
-        'profileName': _profileName,
-        'projectTags': _projectTags,
-      }));
+      await file.writeAsString(
+        jsonEncode({
+          'profileName': _profileName,
+          'renderOnSaveOnly': _renderOnSaveOnly,
+          'projectTags': _projectTags,
+        }),
+      );
     } catch (e) {
       dev.log('Failed to save settings: $e', name: 'SettingsService');
     }
