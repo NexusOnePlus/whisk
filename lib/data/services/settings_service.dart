@@ -15,11 +15,13 @@ class SettingsService extends ChangeNotifier {
   bool _renderOnSaveOnly = false;
   bool _loaded = false;
   final Map<String, List<String>> _projectTags = {};
+  final Map<String, String> _projectAliases = {};
 
   String get profileName => _profileName;
   bool get renderOnSaveOnly => _renderOnSaveOnly;
   bool get loaded => _loaded;
   Map<String, List<String>> get projectTags => Map.unmodifiable(_projectTags);
+  Map<String, String> get projectAliases => Map.unmodifiable(_projectAliases);
 
   List<String> get allTags {
     final tags = <String>{};
@@ -31,6 +33,22 @@ class SettingsService extends ChangeNotifier {
 
   List<String> tagsForProject(String path) =>
       List.unmodifiable(_projectTags[path] ?? []);
+
+  String displayNameFor(String path) {
+    final alias = _projectAliases[path];
+    if (alias != null && alias.isNotEmpty) return alias;
+    return path.split(RegExp(r'[\\/]')).last;
+  }
+
+  Future<void> setProjectAlias(String path, String alias) async {
+    if (alias.isEmpty) {
+      _projectAliases.remove(path);
+    } else {
+      _projectAliases[path] = alias;
+    }
+    notifyListeners();
+    await _save();
+  }
 
   Future<void> load() async {
     if (_loaded) return;
@@ -46,6 +64,12 @@ class SettingsService extends ChangeNotifier {
         if (tags != null) {
           for (final entry in tags.entries) {
             _projectTags[entry.key] = List<String>.from(entry.value as List);
+          }
+        }
+        final aliases = data['projectAliases'] as Map<String, dynamic>?;
+        if (aliases != null) {
+          for (final entry in aliases.entries) {
+            _projectAliases[entry.key] = entry.value as String;
           }
         }
       }
@@ -95,6 +119,7 @@ class SettingsService extends ChangeNotifier {
           'profileName': _profileName,
           'renderOnSaveOnly': _renderOnSaveOnly,
           'projectTags': _projectTags,
+          'projectAliases': _projectAliases,
         }),
       );
     } catch (e) {

@@ -596,6 +596,37 @@ class WorkspaceViewModel extends ChangeNotifier {
     await _refreshProjectFiles();
   }
 
+  Future<void> renameFile(WhiskFile whiskFile, String newName) async {
+    if (_disposed) return;
+    if (newName == whiskFile.name) return;
+    final oldFile = File(whiskFile.path);
+    if (!await oldFile.exists()) return;
+
+    final dir = oldFile.parent;
+    final newPath = '${dir.path}${Platform.pathSeparator}$newName';
+    if (File(newPath).existsSync()) return;
+
+    await oldFile.rename(newPath);
+
+    final newExtension = newName.contains('.')
+        ? '.${newName.split('.').last}'
+        : '';
+    final replacement = whiskFile.copyWith(
+      path: newPath,
+      name: newName,
+      extension: newExtension,
+    );
+
+    _openFiles = _openFiles
+        .map((f) => f.path == whiskFile.path ? replacement : f)
+        .toList();
+    if (_activeFile.path == whiskFile.path) {
+      _activeFile = replacement;
+    }
+
+    await _refreshProjectFiles();
+  }
+
   void _replaceFileInLists(WhiskFile replacement) {
     _projectFiles = _projectFiles
         .map((file) => file.path == replacement.path ? replacement : file)

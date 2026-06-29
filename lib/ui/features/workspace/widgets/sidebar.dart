@@ -25,6 +25,7 @@ class Sidebar extends StatelessWidget {
     required this.onNewFile,
     required this.onNewFolder,
     required this.onDeleteFile,
+    required this.onRenameFile,
     this.section = ProjectSidebarSection.files,
   });
 
@@ -36,6 +37,7 @@ class Sidebar extends StatelessWidget {
   final ValueChanged<String> onNewFile;
   final ValueChanged<String> onNewFolder;
   final ValueChanged<WhiskFile> onDeleteFile;
+  final void Function(WhiskFile file, String newName) onRenameFile;
   final ProjectSidebarSection section;
 
   @override
@@ -55,6 +57,7 @@ class Sidebar extends StatelessWidget {
               onNewFile: onNewFile,
               onNewFolder: onNewFolder,
               onDeleteFile: onDeleteFile,
+              onRenameFile: onRenameFile,
             ),
           ),
           const _SidebarStatus(),
@@ -75,6 +78,7 @@ class _SidebarBody extends StatelessWidget {
     required this.onNewFile,
     required this.onNewFolder,
     required this.onDeleteFile,
+    required this.onRenameFile,
   });
 
   final ProjectSidebarSection section;
@@ -86,6 +90,7 @@ class _SidebarBody extends StatelessWidget {
   final ValueChanged<String> onNewFile;
   final ValueChanged<String> onNewFolder;
   final ValueChanged<WhiskFile> onDeleteFile;
+  final void Function(WhiskFile file, String newName) onRenameFile;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +105,7 @@ class _SidebarBody extends StatelessWidget {
           onNewFile: onNewFile,
           onNewFolder: onNewFolder,
           onDeleteFile: onDeleteFile,
+          onRenameFile: onRenameFile,
         ),
         _SearchSection(
           files: files,
@@ -153,6 +159,7 @@ class _FilesSection extends StatefulWidget {
     required this.onNewFile,
     required this.onNewFolder,
     required this.onDeleteFile,
+    required this.onRenameFile,
   });
 
   final EnvironmentKind environment;
@@ -162,6 +169,7 @@ class _FilesSection extends StatefulWidget {
   final ValueChanged<String> onNewFile;
   final ValueChanged<String> onNewFolder;
   final ValueChanged<WhiskFile> onDeleteFile;
+  final void Function(WhiskFile file, String newName) onRenameFile;
 
   @override
   State<_FilesSection> createState() => _FilesSectionState();
@@ -274,6 +282,9 @@ class _FilesSectionState extends State<_FilesSection> {
             onDelete: widget.file.projectRoot != null
                 ? () => _handleDeleteFile(context, projectFile)
                 : null,
+            onRename: widget.file.projectRoot != null
+                ? () => _handleRenameFile(context, projectFile)
+                : null,
           ),
       ],
     );
@@ -306,6 +317,9 @@ class _FilesSectionState extends State<_FilesSection> {
           onDelete: widget.file.projectRoot != null
               ? () => _handleDeleteFile(context, folder)
               : null,
+          onRename: widget.file.projectRoot != null
+              ? () => _handleRenameFile(context, folder)
+              : null,
           onAddFile: () => _handleNewFileInFolder(context, folder),
           onAddFolder: () => _handleNewFolderInFolder(context, folder),
         ),
@@ -325,6 +339,9 @@ class _FilesSectionState extends State<_FilesSection> {
               onTap: () => widget.onOpenFile(file),
               onDelete: widget.file.projectRoot != null
                   ? () => _handleDeleteFile(context, file)
+                  : null,
+              onRename: widget.file.projectRoot != null
+                  ? () => _handleRenameFile(context, file)
                   : null,
             ),
           ),
@@ -416,6 +433,52 @@ class _FilesSectionState extends State<_FilesSection> {
     });
   }
 
+  void _handleRenameFile(BuildContext context, WhiskFile target) {
+    final controller = TextEditingController(text: target.name);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF22262E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: kBorder),
+        ),
+        title: const Text('Rename', style: TextStyle(color: kTextPrimary, fontSize: 16)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: kTextPrimary),
+          decoration: const InputDecoration(
+            hintText: 'File name',
+            hintStyle: TextStyle(color: kTextMuted),
+          ),
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty && v.trim() != target.name) {
+              widget.onRenameFile(target, v.trim());
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel', style: TextStyle(color: kTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty && controller.text.trim() != target.name) {
+                widget.onRenameFile(target, controller.text.trim());
+                Navigator.of(context).pop();
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: kAccentBlue),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
   IconData _iconFor(WhiskFile file) {
     if (file.isImage) return Icons.image_outlined;
     if (file.isPdf) return Icons.picture_as_pdf_outlined;
@@ -435,9 +498,10 @@ class _FolderRow extends StatelessWidget {
   const _FolderRow({
     required this.folder,
     required this.expanded,
-    required this.selected,
-    required this.onToggle,
+    this.selected = false,
+    this.onToggle,
     this.onDelete,
+    this.onRename,
     this.onAddFile,
     this.onAddFolder,
   });
@@ -445,8 +509,9 @@ class _FolderRow extends StatelessWidget {
   final WhiskFile folder;
   final bool expanded;
   final bool selected;
-  final VoidCallback onToggle;
+  final VoidCallback? onToggle;
   final VoidCallback? onDelete;
+  final VoidCallback? onRename;
   final VoidCallback? onAddFile;
   final VoidCallback? onAddFolder;
 
@@ -537,6 +602,17 @@ class _FolderRow extends StatelessWidget {
       color: const Color(0xFF22262E),
       items: [
         PopupMenuItem(
+          value: 'rename',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 16, color: kTextSecondary),
+              SizedBox(width: 8),
+              Text('Rename', style: TextStyle(color: kTextPrimary, fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
           value: 'delete',
           height: 36,
           child: Row(
@@ -549,6 +625,7 @@ class _FolderRow extends StatelessWidget {
         ),
       ],
     ).then((value) {
+      if (value == 'rename') onRename?.call();
       if (value == 'delete') onDelete?.call();
     });
   }
@@ -563,6 +640,7 @@ class _FileRow extends StatelessWidget {
     this.selected = false,
     this.onTap,
     this.onDelete,
+    this.onRename,
   });
 
   final IconData icon;
@@ -572,6 +650,7 @@ class _FileRow extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onRename;
 
   @override
   Widget build(BuildContext context) {
@@ -641,6 +720,17 @@ class _FileRow extends StatelessWidget {
             ),
           ),
         PopupMenuItem(
+          value: 'rename',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 16, color: kTextSecondary),
+              SizedBox(width: 8),
+              Text('Rename', style: TextStyle(color: kTextPrimary, fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
           value: 'delete',
           height: 36,
           child: Row(
@@ -656,6 +746,7 @@ class _FileRow extends StatelessWidget {
       if (value == 'reveal' && filePath != null) {
         _revealInExplorer(filePath!);
       }
+      if (value == 'rename') onRename?.call();
       if (value == 'delete') onDelete?.call();
     });
   }

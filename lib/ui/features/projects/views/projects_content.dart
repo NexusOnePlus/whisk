@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/collection_service.dart';
 import 'package:whisk/data/services/project_tags_service.dart';
+import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 enum SortMode { name, type, pinned }
@@ -78,7 +79,7 @@ class _ProjectsContentState extends State<ProjectsContent> {
     var result = projects;
     if (_filter.isNotEmpty) {
       result = result.where((p) {
-        final name = p.split(Platform.pathSeparator).last.toLowerCase();
+        final name = SettingsService.instance.displayNameFor(p).toLowerCase();
         return name.contains(_filter.toLowerCase());
       }).toList();
     }
@@ -717,7 +718,7 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.path.split(Platform.pathSeparator).last;
+    final name = SettingsService.instance.displayNameFor(widget.path);
     final type = _typeOf(widget.path);
     final color = _colorForType(type);
     final thumbPath = _findThumbnail();
@@ -874,6 +875,7 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
       color: const Color(0xFF22262E),
       items: [
         PopupMenuItem(value: 'open', height: 36, child: Row(children: [const Icon(Icons.open_in_new, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Open', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
+        PopupMenuItem(value: 'rename', height: 36, child: Row(children: [const Icon(Icons.edit_outlined, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Rename', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
         PopupMenuItem(value: 'pin', height: 36, child: Row(children: [Icon(widget.isPinned ? Icons.push_pin_outlined : Icons.push_pin, size: 16, color: kTextSecondary), const SizedBox(width: 8), Text(widget.isPinned ? 'Unpin' : 'Pin', style: const TextStyle(color: kTextPrimary, fontSize: 13))])),
         PopupMenuItem(value: 'tag', height: 36, child: Row(children: [const Icon(Icons.label_outline, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Add tag', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
         if (widget.onMoveToCollection != null)
@@ -884,11 +886,60 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
     ).then((value) {
       if (!context.mounted) return;
       if (value == 'open') widget.onTap?.call();
+      if (value == 'rename') _showRenameDialog(context);
       if (value == 'pin') widget.onTogglePin?.call();
       if (value == 'tag') _showAddTagDialog(context);
       if (value == 'move') widget.onMoveToCollection?.call();
       if (value == 'remove') widget.onRemove?.call();
     });
+  }
+
+  void _showRenameDialog(BuildContext context) {
+    final controller = TextEditingController(
+      text: SettingsService.instance.displayNameFor(widget.path),
+    );
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF22262E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: kBorder),
+        ),
+        title: const Text('Rename Project', style: TextStyle(color: kTextPrimary, fontSize: 16)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: kTextPrimary),
+          decoration: const InputDecoration(
+            hintText: 'Display name',
+            hintStyle: TextStyle(color: kTextMuted),
+          ),
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) {
+              SettingsService.instance.setProjectAlias(widget.path, v.trim());
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel', style: TextStyle(color: kTextMuted)),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                SettingsService.instance.setProjectAlias(widget.path, controller.text.trim());
+                Navigator.of(context).pop();
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: kAccentBlue),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAddTagDialog(BuildContext context) {

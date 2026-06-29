@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
 enum RailTab { home, projects }
@@ -65,9 +66,9 @@ class AppRail extends StatelessWidget {
           if (openProjects.isNotEmpty) ...[
             const SizedBox(height: 4),
             for (final path in openProjects)
-              if (path.split(RegExp(r'[\\/]')).last != activeProjectTitle)
+              if (SettingsService.instance.displayNameFor(path) != activeProjectTitle)
                 _ProjectPill(
-                  title: path.split(RegExp(r'[\\/]')).last,
+                  title: SettingsService.instance.displayNameFor(path),
                   onTap: onSwitchProject != null
                       ? () => onSwitchProject!(path)
                       : null,

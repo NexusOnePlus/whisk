@@ -65,7 +65,7 @@ class AppShellViewModel extends ChangeNotifier {
     if (workspace == null) return null;
     final root = workspace.activeFile.projectRoot;
     if (root == null) return 'Shared workspace';
-    return root.split(RegExp(r'[\\/]')).last;
+    return SettingsService.instance.displayNameFor(root);
   }
 
   List<WorkspaceViewModel> get collaborationViewModels =>
@@ -164,7 +164,7 @@ class AppShellViewModel extends ChangeNotifier {
     _recentProjectService.save(
       RecentProject(
         path: path,
-        name: path.split(Platform.pathSeparator).last,
+        name: SettingsService.instance.displayNameFor(path),
         type: type,
         lastOpened: DateTime.now().millisecondsSinceEpoch,
         lastFilePath: lastFilePath ?? existing?.lastFilePath,
@@ -408,7 +408,7 @@ class AppShellViewModel extends ChangeNotifier {
         existing ??
         RecentProject(
           path: path,
-          name: path.split(Platform.pathSeparator).last,
+        name: SettingsService.instance.displayNameFor(path),
           type: 'folder',
           lastOpened: DateTime.now().millisecondsSinceEpoch,
         );

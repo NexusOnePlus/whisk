@@ -70,6 +70,7 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
                     onNewFile: vm.createFile,
                     onNewFolder: vm.createFolder,
                     onDeleteFile: vm.deleteFile,
+                    onRenameFile: vm.renameFile,
                   ),
                 ),
                 SidebarPill(

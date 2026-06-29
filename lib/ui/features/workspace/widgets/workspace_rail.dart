@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/workspace/widgets/settings_dialog.dart';
 import 'package:window_manager/window_manager.dart';
@@ -89,9 +90,9 @@ class _WorkspaceRailState extends State<WorkspaceRail> {
             if (widget.openProjects.isNotEmpty) ...[
               const SizedBox(height: 4),
               for (final path in widget.openProjects)
-                if (path.split(RegExp(r'[\\/]')).last != widget.activeProjectTitle)
+                if (SettingsService.instance.displayNameFor(path) != widget.activeProjectTitle)
                   _PinnedProjectItem(
-                    title: path.split(RegExp(r'[\\/]')).last,
+                    title: SettingsService.instance.displayNameFor(path),
                     onTap: widget.onSwitchProject != null
                         ? () => widget.onSwitchProject!(path)
                         : null,
