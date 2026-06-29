@@ -101,11 +101,18 @@ class _ProjectsContentState extends State<ProjectsContent> {
   List<String> get _allTags => _tagsService.allTags;
 
   String _typeOf(String path) {
-    final name = path.split(Platform.pathSeparator).last.toLowerCase();
-    if (name.endsWith('.tex')) return 'latex';
-    if (name.endsWith('.typ')) return 'typst';
-    if (name.endsWith('.mmd')) return 'mermaid';
-    return 'other';
+    final dir = Directory(path);
+    if (dir.existsSync()) {
+      for (final entity in dir.listSync(followLinks: false)) {
+        if (entity is File) {
+          final name = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+          if (name.endsWith('.tex')) return 'latex';
+          if (name.endsWith('.typ')) return 'typst';
+          if (name.endsWith('.mmd')) return 'mermaid';
+        }
+      }
+    }
+    return 'folder';
   }
 
   void _showNewCollectionDialog() {
@@ -486,14 +493,12 @@ class _CollectionSection extends StatelessWidget {
             height: 120,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: kGlassHighlight.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kBorder.withValues(alpha: 0.5)),
             ),
             child: Center(
               child: Text(
                 'No projects here',
-                style: TextStyle(color: kTextMuted.withValues(alpha: 0.5), fontSize: 13),
+                style: TextStyle(color: kTextMuted.withValues(alpha: 0.4), fontSize: 13),
               ),
             ),
           )
@@ -822,10 +827,17 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
   }
 
   String _typeOf(String path) {
-    final name = path.split(Platform.pathSeparator).last.toLowerCase();
-    if (name.endsWith('.tex')) return 'latex';
-    if (name.endsWith('.typ')) return 'typst';
-    if (name.endsWith('.mmd')) return 'mermaid';
+    final dir = Directory(path);
+    if (dir.existsSync()) {
+      for (final entity in dir.listSync(followLinks: false)) {
+        if (entity is File) {
+          final name = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+          if (name.endsWith('.tex')) return 'latex';
+          if (name.endsWith('.typ')) return 'typst';
+          if (name.endsWith('.mmd')) return 'mermaid';
+        }
+      }
+    }
     return 'folder';
   }
 
