@@ -534,7 +534,7 @@ class _RecentProjectCard extends StatelessWidget {
   final VoidCallback onRemove;
 
   static const _cardWidth = 150.0;
-  static const _cardHeight = 210.0;
+  static const _cardHeight = 230.0;
 
   @override
   Widget build(BuildContext context) {
@@ -573,27 +573,47 @@ class _RecentProjectCard extends StatelessWidget {
                   right: 0,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
+                      horizontal: 10,
+                      vertical: 8,
                     ),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          kAppBlack.withValues(alpha: 0.85),
+                          kAppBlack.withValues(alpha: 0.9),
                           kAppBlack.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
-                    child: Text(
-                      project.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: kTextPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          project.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: kTextPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          project.type,
+                          style: TextStyle(
+                            color: _colorForType(project.type),
+                            fontSize: 10,
+                            shadows: const [
+                              Shadow(blurRadius: 3, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -617,31 +637,66 @@ class _RecentProjectCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
-          child: Container(
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withValues(alpha: 0.2)),
-            ),
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
               children: [
-                Icon(icon, color: color, size: 24),
-                const Spacer(),
-                Text(
-                  project.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: kTextPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                Positioned.fill(
+                  child: Container(
+                    color: color.withValues(alpha: 0.1),
+                    child: Icon(icon, color: color, size: 40),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  project.type,
-                  style: TextStyle(color: color, fontSize: 11),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          kAppBlack.withValues(alpha: 0.9),
+                          kAppBlack.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          project.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: kTextPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          project.type,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 10,
+                            shadows: const [
+                              Shadow(blurRadius: 3, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -695,7 +750,7 @@ class _RecentProjectCard extends StatelessWidget {
   String? _renderThumbnailPath() {
     final type = project.type;
     if (type == 'folder') {
-      for (final env in ['latex', 'typst']) {
+      for (final env in ['latex', 'typst', 'mermaid']) {
         final candidate = '${project.path}${Platform.pathSeparator}.whisk'
             '${Platform.pathSeparator}build${Platform.pathSeparator}$env'
             '${Platform.pathSeparator}thumb.png';

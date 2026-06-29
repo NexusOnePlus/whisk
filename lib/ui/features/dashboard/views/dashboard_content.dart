@@ -455,6 +455,7 @@ class _RecentProjectCard extends StatelessWidget {
   final VoidCallback onRemove;
 
   static const _cardWidth = 160.0;
+  static const _cardHeight = 230.0;
 
   @override
   Widget build(BuildContext context) {
@@ -468,43 +469,77 @@ class _RecentProjectCard extends StatelessWidget {
   Widget _buildThumbnailPreview(BuildContext context, String path) {
     return SizedBox(
       width: _cardWidth,
+      height: _cardHeight,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  height: 200,
-                  width: _cardWidth,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned.fill(
                   child: Image.file(
                     File(path),
                     fit: BoxFit.cover,
                     alignment: Alignment.topCenter,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                project.name,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          kAppBlack.withValues(alpha: 0.9),
+                          kAppBlack.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          project.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: kTextPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          project.type,
+                          style: TextStyle(
+                            color: _colorForType(project.type),
+                            fontSize: 10,
+                            shadows: const [
+                              Shadow(blurRadius: 3, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                project.type,
-                style: TextStyle(color: _colorForType(project.type), fontSize: 10),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -516,41 +551,76 @@ class _RecentProjectCard extends StatelessWidget {
     final icon = _iconForType(project.type);
     return SizedBox(
       width: _cardWidth,
+      height: _cardHeight,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 220,
-                width: _cardWidth,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withValues(alpha: 0.2)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned.fill(
+                  child: Container(
+                    color: color.withValues(alpha: 0.1),
+                    child: Icon(icon, color: color, size: 40),
+                  ),
                 ),
-                child: Icon(icon, color: color, size: 40),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                project.name,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          kAppBlack.withValues(alpha: 0.9),
+                          kAppBlack.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          project.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: kTextPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          project.type,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 10,
+                            shadows: const [
+                              Shadow(blurRadius: 3, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                project.type,
-                style: TextStyle(color: color, fontSize: 10),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -601,7 +671,7 @@ class _RecentProjectCard extends StatelessWidget {
   String? _renderThumbnailPath() {
     final type = project.type;
     if (type == 'folder') {
-      for (final env in ['latex', 'typst']) {
+      for (final env in ['latex', 'typst', 'mermaid']) {
         final candidate = '${project.path}${Platform.pathSeparator}.whisk'
             '${Platform.pathSeparator}build${Platform.pathSeparator}$env'
             '${Platform.pathSeparator}thumb.png';

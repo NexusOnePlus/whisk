@@ -218,28 +218,63 @@ class _SortDropdown extends StatelessWidget {
   final SortMode value;
   final ValueChanged<SortMode> onChanged;
 
+  String _labelFor(SortMode mode) => switch (mode) {
+    SortMode.name => 'Name',
+    SortMode.type => 'Type',
+    SortMode.pinned => 'Pinned first',
+  };
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: kGlassHighlight,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: kBorder),
+    return PopupMenuButton<SortMode>(
+      onSelected: onChanged,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: kBorder),
       ),
-      child: DropdownButton<SortMode>(
-        value: value,
-        underline: const SizedBox.shrink(),
-        dropdownColor: const Color(0xFF22262E),
-        style: const TextStyle(color: kTextPrimary, fontSize: 12),
-        icon: const Icon(Icons.expand_more, size: 16, color: kTextMuted),
-        items: const [
-          DropdownMenuItem(value: SortMode.name, child: Text('Name')),
-          DropdownMenuItem(value: SortMode.type, child: Text('Type')),
-          DropdownMenuItem(value: SortMode.pinned, child: Text('Pinned first')),
-        ],
-        onChanged: (v) { if (v != null) onChanged(v); },
+      color: const Color(0xFF22262E),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: kGlassHighlight,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: kBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _labelFor(value),
+              style: const TextStyle(color: kTextPrimary, fontSize: 12),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.expand_more, size: 14, color: kTextMuted),
+          ],
+        ),
       ),
+      itemBuilder: (context) => [
+        for (final mode in SortMode.values)
+          PopupMenuItem(
+            value: mode,
+            height: 36,
+            child: Row(
+              children: [
+                if (mode == value)
+                  Icon(Icons.check, size: 14, color: kAccentBlue)
+                else
+                  const SizedBox(width: 14),
+                const SizedBox(width: 8),
+                Text(
+                  _labelFor(mode),
+                  style: TextStyle(
+                    color: mode == value ? kAccentBlue : kTextPrimary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -271,11 +306,13 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
   bool _hovered = false;
 
   static const _cardWidth = 160.0;
+  static const _cardHeight = 230.0;
 
   @override
   Widget build(BuildContext context) {
     final name = widget.path.split(Platform.pathSeparator).last;
-    final color = _colorForType(_typeOf(widget.path));
+    final type = _typeOf(widget.path);
+    final color = _colorForType(type);
     final thumbPath = _findThumbnail();
 
     return MouseRegion(
@@ -288,60 +325,95 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
           duration: const Duration(milliseconds: 150),
           transform: _hovered ? (Matrix4.identity()..setTranslationRaw(0, -2, 0)) : Matrix4.identity(),
           width: _cardWidth,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                height: 220,
-                width: _cardWidth,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: widget.isPinned
-                          ? kAccentAmber.withValues(alpha: 0.4)
-                          : _hovered ? kBorder : color.withValues(alpha: 0.2),
-                    ),
-                  ),
+          height: _cardHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned.fill(
                   child: thumbPath != null
                       ? Image.file(File(thumbPath), fit: BoxFit.cover, alignment: Alignment.topCenter)
-                      : Icon(_iconForType(_typeOf(widget.path)), color: color, size: 40),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                name,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _typeOf(widget.path),
-                style: TextStyle(color: color, fontSize: 10),
-              ),
-              if (widget.tags.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: [
-                      for (final tag in widget.tags)
-                        _TagChip(
-                          label: tag,
-                          color: kAccentAmber,
-                          selected: false,
-                          onTap: () => widget.onRemoveTag?.call(tag),
+                      : Container(
+                          color: color.withValues(alpha: 0.1),
+                          child: Icon(_iconForType(type), color: color, size: 40),
                         ),
-                    ],
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          kAppBlack.withValues(alpha: 0.9),
+                          kAppBlack.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: kTextPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          type,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 10,
+                            shadows: const [
+                              Shadow(blurRadius: 3, color: Colors.black87),
+                            ],
+                          ),
+                        ),
+                        if (widget.tags.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              for (final tag in widget.tags)
+                                _TagChip(
+                                  label: tag,
+                                  color: kAccentAmber,
+                                  selected: false,
+                                  onTap: () => widget.onRemoveTag?.call(tag),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                if (widget.isPinned)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Icon(
+                      Icons.push_pin,
+                      size: 14,
+                      color: kAccentAmber.withValues(alpha: 0.8),
+                    ),
                   ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -349,7 +421,7 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
   }
 
   String? _findThumbnail() {
-    for (final env in ['latex', 'typst']) {
+    for (final env in ['latex', 'typst', 'mermaid']) {
       final candidate = '${widget.path}${Platform.pathSeparator}.whisk'
           '${Platform.pathSeparator}build${Platform.pathSeparator}$env'
           '${Platform.pathSeparator}thumb.png';
