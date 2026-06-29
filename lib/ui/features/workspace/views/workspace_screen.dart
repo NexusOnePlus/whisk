@@ -12,6 +12,7 @@ import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dar
 import 'package:whisk/ui/features/workspace/widgets/editor_content_frame.dart';
 import 'package:whisk/ui/features/workspace/widgets/editor_navbar.dart';
 import 'package:whisk/ui/features/workspace/widgets/join_invite_dialog.dart';
+import 'package:whisk/ui/features/workspace/widgets/log_viewer_dialog.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -243,6 +244,13 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     );
   }
 
+  void _showLogs() {
+    showDialog(
+      context: context,
+      builder: (context) => const LogViewerDialog(),
+    );
+  }
+
   void _refreshFindMatches() {
     final query = _findController.text;
     if (query.isEmpty) {
@@ -348,6 +356,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                           onCloseProject: widget.onCloseProject,
                           onTogglePin: widget.onTogglePin,
                           onSwitchProject: widget.onSwitchProject,
+                          onShowLogs: _showLogs,
                         ),
                         Expanded(
                           child: Padding(
@@ -359,6 +368,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                                   onCreateInvite: _createCollaborationInvite,
                                   onJoinInvite: _joinCollaborationInvite,
                                   onAbout: widget.onAbout,
+                                  onShowLogs: _showLogs,
                                 ),
                                 const SizedBox(height: 6),
                                 EditorContentFrame(

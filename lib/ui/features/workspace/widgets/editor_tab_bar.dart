@@ -8,11 +8,13 @@ class EditorTabBar extends StatelessWidget {
     required this.file,
     required this.openFiles,
     required this.onSelectFile,
+    this.onCloseFile,
   });
 
   final WhiskFile file;
   final List<WhiskFile> openFiles;
   final ValueChanged<WhiskFile> onSelectFile;
+  final ValueChanged<WhiskFile>? onCloseFile;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,7 @@ class EditorTabBar extends StatelessWidget {
             active: active,
             accent: active ? kAccentBlue : null,
             onTap: () => onSelectFile(tabFile),
+            onClose: onCloseFile != null ? () => onCloseFile!(tabFile) : null,
           );
         },
       ),
@@ -54,7 +57,7 @@ class EditorTabBar extends StatelessWidget {
   }
 }
 
-class FileTabPill extends StatelessWidget {
+class FileTabPill extends StatefulWidget {
   const FileTabPill({
     super.key,
     required this.label,
@@ -62,6 +65,7 @@ class FileTabPill extends StatelessWidget {
     this.active = false,
     this.accent,
     this.onTap,
+    this.onClose,
   });
 
   final String label;
@@ -69,48 +73,83 @@ class FileTabPill extends StatelessWidget {
   final bool active;
   final Color? accent;
   final VoidCallback? onTap;
+  final VoidCallback? onClose;
+
+  @override
+  State<FileTabPill> createState() => _FileTabPillState();
+}
+
+class _FileTabPillState extends State<FileTabPill> {
+  var _hovering = false;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: onTap,
-      child: Container(
-        height: 26,
-        constraints: const BoxConstraints(maxWidth: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: active ? kGlassHighlight : kAppBlack.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: active ? (accent ?? kBorder) : kBorder),
-          gradient: active
-              ? LinearGradient(
-                  colors: [
-                    (accent ?? kAccentBlue).withValues(alpha: 0.22),
-                    kGlassBase,
-                  ],
-                )
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, color: accent ?? kTextSecondary, size: 14),
-              const SizedBox(width: 5),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: active ? kTextPrimary : kTextSecondary,
-                  fontSize: 12,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+    final onClose = widget.onClose;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: widget.onTap,
+        child: Container(
+          height: 26,
+          constraints: const BoxConstraints(maxWidth: 180),
+          padding: EdgeInsets.only(
+            left: 10,
+            right: onClose != null && _hovering ? 4 : 10,
+          ),
+          decoration: BoxDecoration(
+            color: widget.active
+                ? kGlassHighlight
+                : kAppBlack.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: widget.active ? (widget.accent ?? kBorder) : kBorder,
+            ),
+            gradient: widget.active
+                ? LinearGradient(
+                    colors: [
+                      (widget.accent ?? kAccentBlue).withValues(alpha: 0.22),
+                      kGlassBase,
+                    ],
+                  )
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.icon != null) ...[
+                Icon(widget.icon, color: widget.accent ?? kTextSecondary, size: 14),
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(
+                  widget.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: widget.active ? kTextPrimary : kTextSecondary,
+                    fontSize: 12,
+                    fontWeight: widget.active ? FontWeight.w700 : FontWeight.w500,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (onClose != null && _hovering) ...[
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: onClose,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: kGlassHighlight,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(Icons.close, size: 12, color: kTextMuted),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

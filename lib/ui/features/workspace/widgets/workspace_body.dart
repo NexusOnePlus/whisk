@@ -28,14 +28,53 @@ class WorkspaceBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = viewModel.activeFile;
+    if (active.path.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.description_outlined, color: kTextMuted, size: 36),
+            SizedBox(height: 12),
+            Text(
+              'No files open',
+              style: TextStyle(color: kTextMuted, fontSize: 14),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Open a file from the sidebar\nto start editing.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: kTextMuted, fontSize: 11),
+            ),
+          ],
+        ),
+      );
+    }
     final Widget editor;
     if (active.isImage) {
       editor = ImageFilePane(file: active);
     } else if (active.isPdf) {
-      editor = PdfViewer.file(
-        active.path,
-        key: ValueKey(active.path),
-        params: const PdfViewerParams(backgroundColor: Colors.transparent),
+      editor = ExcludeSemantics(
+        child: PdfViewer.file(
+          active.path,
+          key: ValueKey(active.path),
+          params: PdfViewerParams(
+            backgroundColor: Colors.transparent,
+            errorBannerBuilder: (context, error, stackTrace, documentRef) =>
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.picture_as_pdf, color: kTextMuted, size: 32),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Could not open PDF',
+                        style: const TextStyle(color: kTextMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+          ),
+        ),
       );
     } else {
       final remotePeers = viewModel.collaborationPeers

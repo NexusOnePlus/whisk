@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:whisk/data/services/update_service.dart';
 import 'package:whisk/data/services/updater_config.dart';
@@ -26,13 +26,9 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
 
   Future<void> _loadVersion() async {
     try {
-      final pubspecFile = File('pubspec.yaml');
-      if (await pubspecFile.exists()) {
-        final content = pubspecFile.readAsStringSync();
-        final versionMatch = RegExp(r'version:\s*(\S+)').firstMatch(content);
-        final version = versionMatch?.group(1)?.split('+').first ?? '0.0.0';
-        setState(() => _version = version);
-      }
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _version = info.version);
     } catch (_) {
       setState(() => _version = '0.0.0');
     }
@@ -57,7 +53,7 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
       _checking = false;
       if (update != null) {
         _updateInfo = update;
-        _status = 'Version ${update.version} is available';
+        _status = 'Latest: ${update.version}';
       } else {
         _status = 'You are up to date';
       }
@@ -106,9 +102,32 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Version $_version',
-            style: const TextStyle(color: kTextSecondary, fontSize: 13),
+          Row(
+            children: [
+              Text(
+                'Current: $_version',
+                style: const TextStyle(color: kTextSecondary, fontSize: 13),
+              ),
+              if (_updateInfo != null) ...[
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: kAccentBlue.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: kAccentBlue.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    _status,
+                    style: const TextStyle(
+                      color: kAccentBlue,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -133,12 +152,12 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
               ),
             ),
           ),
-          if (_status.isNotEmpty) ...[
+          if (_status.isNotEmpty && _updateInfo == null) ...[
             const SizedBox(height: 8),
             Text(
               _status,
-              style: TextStyle(
-                color: _updateInfo != null ? kAccentBlue : kTextMuted,
+              style: const TextStyle(
+                color: kTextMuted,
                 fontSize: 12,
               ),
             ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 class MathBlockElement extends md.Element {
@@ -70,10 +70,13 @@ class MathBlockBuilder extends MarkdownElementBuilder {
     if (element is MathBlockElement) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Center(
-          child: Math.tex(
-            element.tex,
-            textStyle: const TextStyle(fontSize: 16, color: Colors.white),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Center(
+            child: Math.tex(
+              element.tex,
+              textStyle: const TextStyle(fontSize: 16, color: Colors.white),
+            ),
           ),
         ),
       );

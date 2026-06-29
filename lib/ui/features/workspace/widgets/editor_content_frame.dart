@@ -67,6 +67,7 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
                         file: vm.activeFile,
                         files: vm.projectFiles,
                         environment: vm.selectedEnvironment,
+                        renderResult: vm.renderResult,
                         onOpenFile: vm.openFile,
                         onNewFile: vm.createFile,
                         onNewFolder: vm.createFolder,
@@ -88,6 +89,7 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
                       file: vm.activeFile,
                       openFiles: vm.openFiles,
                       onSelectFile: vm.openFile,
+                      onCloseFile: vm.closeFile,
                     ),
                     const SizedBox(height: 6),
                     Expanded(

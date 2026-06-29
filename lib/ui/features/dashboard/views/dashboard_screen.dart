@@ -1,10 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:pdfrx/pdfrx.dart';
 import 'package:whisk/domain/models/recent_project.dart';
 import 'package:whisk/ui/core/ambient_glow_painter.dart';
-import 'package:whisk/ui/core/glass_panel.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
@@ -526,14 +524,14 @@ class _RecentProjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final renderPath = _renderPdfPath();
-    if (renderPath != null) {
-      return _buildPdfPreview(context, renderPath);
+    final thumbPath = _renderThumbnailPath();
+    if (thumbPath != null) {
+      return _buildThumbnailPreview(context, thumbPath);
     }
     return _buildFallback(context);
   }
 
-  Widget _buildPdfPreview(BuildContext context, String path) {
+  Widget _buildThumbnailPreview(BuildContext context, String path) {
     return SizedBox(
       width: _cardWidth,
       height: _cardHeight,
@@ -546,22 +544,14 @@ class _RecentProjectCard extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Stack(
-              fit: StackFit.expand,
+              clipBehavior: Clip.hardEdge,
               children: [
-                PdfDocumentViewBuilder.file(
-                  path,
-                  loadingBuilder: (_) => _buildFallback(context),
-                  builder: (context, document) {
-                    if (document == null) return _buildFallback(context);
-                    return PdfPageView(
-                      document: document,
-                      pageNumber: 1,
-                      maximumDpi: 72,
-                      alignment: Alignment.topCenter,
-                      backgroundColor: kAppBlack,
-                      decoration: const BoxDecoration(),
-                    );
-                  },
+                Positioned.fill(
+                  child: Image.file(
+                    File(path),
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
                 ),
                 Positioned(
                   bottom: 0,
@@ -688,20 +678,20 @@ class _RecentProjectCard extends StatelessWidget {
     });
   }
 
-  String? _renderPdfPath() {
+  String? _renderThumbnailPath() {
     final type = project.type;
     if (type == 'folder') {
       for (final env in ['latex', 'typst']) {
         final candidate = '${project.path}${Platform.pathSeparator}.whisk'
             '${Platform.pathSeparator}build${Platform.pathSeparator}$env'
-            '${Platform.pathSeparator}output.pdf';
+            '${Platform.pathSeparator}thumb.png';
         if (File(candidate).existsSync()) return candidate;
       }
       return null;
     }
     final candidate = '${project.path}${Platform.pathSeparator}.whisk'
         '${Platform.pathSeparator}build${Platform.pathSeparator}$type'
-        '${Platform.pathSeparator}output.pdf';
+        '${Platform.pathSeparator}thumb.png';
     if (File(candidate).existsSync()) return candidate;
     return null;
   }

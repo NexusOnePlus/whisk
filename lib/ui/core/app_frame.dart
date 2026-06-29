@@ -14,7 +14,7 @@ class AppFrame extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(child: child),
-        const Positioned(top: 12, right: 12, child: WindowTitleBar()),
+        const Positioned(top: 0, right: 12, child: WindowTitleBar()),
       ],
     );
   }

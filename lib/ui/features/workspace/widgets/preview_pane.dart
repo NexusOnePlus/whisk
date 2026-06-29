@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart'
-    hide MarkdownStyleSheet;
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/ui/core/math_markdown_extension.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
+import 'package:whisk/ui/features/workspace/widgets/mermaid_preview.dart';
 
 class PreviewPane extends StatelessWidget {
   const PreviewPane({
@@ -72,7 +71,7 @@ class PreviewPane extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           child: MermaidDiagram(
             code: content,
-            style: MermaidStyle.dark(),
+            style: MermaidStyle.dark,
           ),
         ),
       ),
@@ -80,7 +79,7 @@ class PreviewPane extends StatelessWidget {
   }
 
   Widget _buildPdfViewer() {
-    return switch (result.state) {
+    final viewer = switch (result.state) {
         RenderState.rendering => const Center(
           child: SizedBox(
             width: 24,
@@ -88,10 +87,28 @@ class PreviewPane extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
-        RenderState.success when result.pdfPath != null => PdfViewer.file(
-          result.pdfPath!,
-          key: ValueKey(result.pdfPath),
-          params: const PdfViewerParams(backgroundColor: Colors.transparent),
+        RenderState.success when result.pdfPath != null => ExcludeSemantics(
+          child: PdfViewer.file(
+            result.pdfPath!,
+            key: ValueKey(result.pdfPath),
+            params: PdfViewerParams(
+              backgroundColor: Colors.transparent,
+              errorBannerBuilder: (context, error, stackTrace, documentRef) =>
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.picture_as_pdf, color: kTextMuted, size: 32),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Could not open PDF',
+                          style: const TextStyle(color: kTextMuted, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+            ),
+          ),
         ),
         RenderState.failed => Center(
           child: Column(
@@ -114,5 +131,7 @@ class PreviewPane extends StatelessWidget {
           ),
         ),
       };
+
+    return viewer;
   }
 }

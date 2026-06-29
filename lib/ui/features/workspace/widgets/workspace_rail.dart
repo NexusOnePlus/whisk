@@ -12,6 +12,8 @@ class WorkspaceRail extends StatefulWidget {
     this.onSwitchProject,
     this.onCloseProject,
     this.onTogglePin,
+    this.onHelp,
+    this.onShowLogs,
   });
 
   final String? activeProjectTitle;
@@ -21,6 +23,8 @@ class WorkspaceRail extends StatefulWidget {
   final ValueChanged<String>? onSwitchProject;
   final VoidCallback? onCloseProject;
   final ValueChanged<String>? onTogglePin;
+  final VoidCallback? onHelp;
+  final VoidCallback? onShowLogs;
 
   @override
   State<WorkspaceRail> createState() => _WorkspaceRailState();
@@ -104,10 +108,39 @@ class _WorkspaceRailState extends State<WorkspaceRail> {
                   ),
             ],
             const Spacer(),
-            _RailButton(
-              icon: Icons.help_outline,
-              label: 'Help',
-              onPressed: () {},
+            Builder(
+              builder: (context) => _RailButton(
+                icon: Icons.help_outline,
+                label: 'Help',
+                onPressed: () {
+                  showMenu<String>(
+                    context: context,
+                    position: RelativeRect.fromLTRB(70, 0, 70, 0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: kBorder),
+                    ),
+                    color: const Color(0xFF22262E),
+                    items: [
+                      PopupMenuItem(
+                        value: 'logs',
+                        height: 36,
+                        child: Row(
+                          children: [
+                            Icon(Icons.terminal, size: 16, color: kTextSecondary),
+                            SizedBox(width: 8),
+                            Text('Logs', style: TextStyle(color: kTextPrimary, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ).then((value) {
+                    if (value == 'logs') {
+                      widget.onShowLogs?.call();
+                    }
+                  });
+                },
+              ),
             ),
             const SizedBox(height: 8),
             const _RailDivider(),

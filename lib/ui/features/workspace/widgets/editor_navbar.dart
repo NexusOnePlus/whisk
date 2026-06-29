@@ -9,6 +9,7 @@ class EditorNavbar extends StatelessWidget {
     this.onJoinInvite,
     this.onImportFile,
     this.onAbout,
+    this.onShowLogs,
   });
 
   final VoidCallback onCloseWorkspace;
@@ -16,6 +17,7 @@ class EditorNavbar extends StatelessWidget {
   final VoidCallback? onJoinInvite;
   final VoidCallback? onImportFile;
   final VoidCallback? onAbout;
+  final VoidCallback? onShowLogs;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +51,16 @@ class EditorNavbar extends StatelessWidget {
                 icon: Icons.info_outline,
                 label: 'About Whisk',
                 onTap: onAbout,
+              ),
+            ],
+          ),
+          _NavBarDropdown(
+            label: 'Help',
+            items: [
+              _NavBarMenuItem(
+                icon: Icons.terminal,
+                label: 'Logs',
+                onTap: onShowLogs,
               ),
             ],
           ),
