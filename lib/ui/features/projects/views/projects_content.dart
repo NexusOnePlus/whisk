@@ -60,7 +60,7 @@ class _ProjectsContentState extends State<ProjectsContent> {
       ...widget.pinnedProjects,
       ...widget.openProjects,
       ...widget.recentProjects,
-    }.toList();
+    }.where((p) => Directory(p).existsSync()).toList();
     switch (_sort) {
       case SortMode.name:
         all.sort();

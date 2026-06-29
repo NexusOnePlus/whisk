@@ -491,7 +491,9 @@ class _RecentProjectsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (projects.isEmpty) {
+    final validProjects = projects.where((p) => Directory(p.path).existsSync()).toList();
+
+    if (validProjects.isEmpty) {
       return Container(
         height: 120,
         decoration: BoxDecoration(
@@ -511,7 +513,7 @@ class _RecentProjectsGrid extends StatelessWidget {
       spacing: 12,
       runSpacing: 12,
       children: [
-        for (final project in projects)
+        for (final project in validProjects)
           _RecentProjectCard(
             project: project,
             onTap: () => onOpenRecentProject(project),
