@@ -278,25 +278,6 @@ class AppShellViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void showProjects() {
-    if (_disposed) return;
-    _previousMode = _mode;
-    _mode = AppShellMode.projects;
-    notifyListeners();
-  }
-
-  void resumeFromProjects() {
-    if (_disposed) return;
-    if (_previousMode == AppShellMode.workspace && _workspaceViewModel != null) {
-      _mode = AppShellMode.workspace;
-    } else {
-      _mode = AppShellMode.dashboard;
-    }
-    notifyListeners();
-  }
-
-  AppShellMode? _previousMode;
-
   void resumeActiveWorkspace() {
     if (_disposed) return;
     if (_workspaceViewModel == null) return;

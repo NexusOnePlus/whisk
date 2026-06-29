@@ -3,9 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/project_tags_service.dart';
 import 'package:whisk/domain/models/recent_project.dart';
-import 'package:whisk/ui/core/ambient_glow_painter.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
-import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
 enum AppSidebarTab { home, projects, files, search, diagnostics }
 
@@ -16,11 +14,9 @@ class AppSidebar extends StatefulWidget {
     this.openProjects = const [],
     this.pinnedProjects = const [],
     this.recentProjects = const [],
-    this.workspaceFiles = const [],
+    this.isInWorkspace = false,
     this.onSwitchProject,
     this.onTogglePin,
-    this.onCloseProject,
-    this.onOpenProject,
     this.onOpenRecentProject,
     this.onRemoveRecentProject,
     this.onOpenDraftWorkspace,
@@ -33,10 +29,9 @@ class AppSidebar extends StatefulWidget {
   final List<String> openProjects;
   final List<String> pinnedProjects;
   final List<RecentProject> recentProjects;
-  final List<dynamic> workspaceFiles;
+  final bool isInWorkspace;
   final ValueChanged<String>? onSwitchProject;
   final ValueChanged<String>? onTogglePin;
-  final ValueChanged<String>? onCloseProject;
   final ValueChanged<RecentProject>? onOpenRecentProject;
   final ValueChanged<String>? onRemoveRecentProject;
   final ValueChanged<int>? onOpenDraftWorkspace;
@@ -50,18 +45,15 @@ class AppSidebar extends StatefulWidget {
 
 class _AppSidebarState extends State<AppSidebar> {
   AppSidebarTab _tab = AppSidebarTab.home;
-  bool _isInWorkspace = false;
 
-  void setWorkspaceMode(bool inWorkspace) {
-    if (_isInWorkspace == inWorkspace) return;
-    setState(() {
-      _isInWorkspace = inWorkspace;
-      if (inWorkspace) {
-        _tab = AppSidebarTab.files;
-      } else {
-        _tab = AppSidebarTab.home;
-      }
-    });
+  @override
+  void didUpdateWidget(covariant AppSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isInWorkspace && !oldWidget.isInWorkspace) {
+      _tab = AppSidebarTab.files;
+    } else if (!widget.isInWorkspace && oldWidget.isInWorkspace) {
+      _tab = AppSidebarTab.home;
+    }
   }
 
   @override
@@ -78,7 +70,6 @@ class _AppSidebarState extends State<AppSidebar> {
             onSelectTab: (tab) => setState(() => _tab = tab),
             onSwitchProject: widget.onSwitchProject,
             onTogglePin: widget.onTogglePin,
-            onCloseProject: widget.onCloseProject,
           ),
           Container(width: 1, color: kBorder),
           Expanded(
@@ -126,7 +117,6 @@ class _RailColumn extends StatelessWidget {
     required this.onSelectTab,
     this.onSwitchProject,
     this.onTogglePin,
-    this.onCloseProject,
   });
 
   final String? activeProjectTitle;
@@ -136,7 +126,6 @@ class _RailColumn extends StatelessWidget {
   final ValueChanged<AppSidebarTab> onSelectTab;
   final ValueChanged<String>? onSwitchProject;
   final ValueChanged<String>? onTogglePin;
-  final ValueChanged<String>? onCloseProject;
 
   @override
   Widget build(BuildContext context) {
@@ -167,9 +156,6 @@ class _RailColumn extends StatelessWidget {
             _ActiveProjectItem(
               title: activeProjectTitle!,
               isPinned: pinnedProjects.contains(activeProjectTitle),
-              onClose: onCloseProject != null
-                  ? () => onCloseProject!(activeProjectTitle!)
-                  : null,
               onTogglePin: onTogglePin != null
                   ? () => onTogglePin!(activeProjectTitle!)
                   : null,
@@ -302,13 +288,11 @@ class _ActiveProjectItem extends StatelessWidget {
   const _ActiveProjectItem({
     required this.title,
     required this.isPinned,
-    this.onClose,
     this.onTogglePin,
   });
 
   final String title;
   final bool isPinned;
-  final VoidCallback? onClose;
   final VoidCallback? onTogglePin;
 
   @override

@@ -15,7 +15,6 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   late final AppShellViewModel viewModel;
-  final _sidebarKey = GlobalKey<AppSidebarState>();
 
   @override
   void initState() {
@@ -36,26 +35,19 @@ class _AppShellState extends State<AppShell> {
       builder: (context, _) {
         final isWorkspace = viewModel.mode == AppShellMode.workspace;
 
-        if (isWorkspace) {
-          _sidebarKey.currentState?.setWorkspaceMode(true);
-        } else {
-          _sidebarKey.currentState?.setWorkspaceMode(false);
-        }
-
         return Scaffold(
           backgroundColor: kAppBlack,
           body: SafeArea(
             child: Row(
               children: [
                 AppSidebar(
-                  key: _sidebarKey,
                   activeProjectTitle: viewModel.activeWorkspaceTitle,
                   openProjects: viewModel.openProjectPaths,
                   pinnedProjects: viewModel.pinnedProjects,
                   recentProjects: viewModel.recentProjects,
+                  isInWorkspace: isWorkspace,
                   onSwitchProject: viewModel.switchToProject,
                   onTogglePin: viewModel.togglePinProject,
-                  onCloseProject: viewModel.closeAndRemoveWorkspace,
                   onOpenRecentProject: viewModel.openRecentProject,
                   onRemoveRecentProject: viewModel.removeRecentProject,
                   onOpenDraftWorkspace: (int i) => viewModel.openDraftWorkspace(i),
