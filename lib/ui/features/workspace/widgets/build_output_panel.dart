@@ -29,15 +29,19 @@ class _BuildOutputPanelState extends State<BuildOutputPanel> {
 
     final allLines = log.split('\n');
     final errorLines = allLines
-        .where((l) => l.contains(RegExp(r'error|failed|denied', caseSensitive: false)))
+        .where((l) => l.contains(RegExp(r'error[: ]|failed|denied|access denied', caseSensitive: false)))
         .toList();
-    final displayLines = _showErrorsOnly ? errorLines : allLines;
+    final warningLines = allLines
+        .where((l) => l.contains(RegExp(r'warning', caseSensitive: false)) &&
+            !l.contains(RegExp(r'error', caseSensitive: false)))
+        .toList();
+    final displayLines = _showErrorsOnly ? [...errorLines, ...warningLines] : allLines;
     final hasErrors = errorLines.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader(hasErrors, errorLines.length),
+        _buildHeader(hasErrors, errorLines.length, warningLines.length),
         const Divider(color: kBorder, height: 1),
         Expanded(
           child: displayLines.isEmpty
@@ -81,7 +85,7 @@ class _BuildOutputPanelState extends State<BuildOutputPanel> {
     return TextSpan(text: line, style: TextStyle(color: color));
   }
 
-  Widget _buildHeader(bool hasErrors, int errorCount) {
+  Widget _buildHeader(bool hasErrors, int errorCount, int warningCount) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
       child: Row(
@@ -101,7 +105,7 @@ class _BuildOutputPanelState extends State<BuildOutputPanel> {
             ),
           ),
           const Spacer(),
-          if (hasErrors)
+          if (hasErrors || warningCount > 0)
             GestureDetector(
               onTap: () => setState(() => _showErrorsOnly = !_showErrorsOnly),
               child: Container(
@@ -118,7 +122,9 @@ class _BuildOutputPanelState extends State<BuildOutputPanel> {
                   ),
                 ),
                 child: Text(
-                  '$errorCount ${errorCount == 1 ? 'error' : 'errors'}',
+                  '${errorCount > 0 ? "$errorCount error${errorCount > 1 ? "s" : ""}" : ""}'
+                  '${errorCount > 0 && warningCount > 0 ? " · " : ""}'
+                  '${warningCount > 0 ? "$warningCount warn${warningCount > 1 ? "s" : ""}" : ""}',
                   style: const TextStyle(
                     color: kDangerRed,
                     fontSize: 10,

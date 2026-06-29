@@ -16,13 +16,24 @@ class DocumentRenderService {
   final EngineProvisionService engineProvisionService;
 
   static Future<void> _safeWriteFile(File target, String content) async {
-    final temp = File('${target.path}.tmp');
+    final tempPath = '${target.path}.${DateTime.now().microsecondsSinceEpoch}.tmp';
+    final temp = File(tempPath);
     await temp.writeAsString(content);
     try {
       await temp.rename(target.path);
     } on FileSystemException {
-      await target.writeAsString(content);
-      try { await temp.delete(); } catch (_) {}
+      try {
+        if (await target.exists()) await target.delete();
+        await temp.rename(target.path);
+      } on FileSystemException {
+        try {
+          await target.writeAsString(content);
+        } on FileSystemException {
+          try { await temp.delete(); } catch (_) {}
+          rethrow;
+        }
+        try { await temp.delete(); } catch (_) {}
+      }
     }
   }
 
