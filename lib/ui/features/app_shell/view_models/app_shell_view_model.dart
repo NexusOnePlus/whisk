@@ -8,6 +8,7 @@ import 'package:whisk/data/services/invite_codec.dart';
 import 'package:whisk/data/services/pinned_project_service.dart';
 import 'package:whisk/data/services/project_open_service.dart';
 import 'package:whisk/data/services/recent_project_service.dart';
+import 'package:whisk/data/services/project_tags_service.dart';
 import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/data/services/workspace_config_service.dart';
 import 'package:whisk/domain/models/recent_project.dart';
@@ -23,6 +24,7 @@ class AppShellViewModel extends ChangeNotifier {
     _pinnedProjectService.addListener(_onPinnedChanged);
     _pinnedProjectService.load();
     SettingsService.instance.load();
+    ProjectTagsService.instance.load();
   }
 
   final RecentProjectService _recentProjectService = RecentProjectService();

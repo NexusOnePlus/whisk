@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:whisk/data/services/project_tags_service.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 
+enum SortMode { name, type, pinned }
+
 class ProjectsContent extends StatefulWidget {
   const ProjectsContent({
     super.key,
@@ -27,11 +29,28 @@ class ProjectsContent extends StatefulWidget {
 class _ProjectsContentState extends State<ProjectsContent> {
   String _filter = '';
   String? _tagFilter;
+  SortMode _sort = SortMode.name;
   final _tagsService = ProjectTagsService.instance;
 
   List<String> get _allProjects {
-    final all = <String>{...widget.pinnedProjects, ...widget.openProjects};
-    return all.toList()..sort();
+    final all = <String>{...widget.pinnedProjects, ...widget.openProjects}.toList();
+    switch (_sort) {
+      case SortMode.name:
+        all.sort();
+      case SortMode.type:
+        all.sort((a, b) => _typeOf(a).compareTo(_typeOf(b)));
+      case SortMode.pinned:
+        return [...widget.pinnedProjects, ...widget.openProjects.where((p) => !widget.pinnedProjects.contains(p))];
+    }
+    return all;
+  }
+
+  String _typeOf(String path) {
+    final name = path.split(Platform.pathSeparator).last.toLowerCase();
+    if (name.endsWith('.tex')) return 'latex';
+    if (name.endsWith('.typ')) return 'typst';
+    if (name.endsWith('.mmd')) return 'mermaid';
+    return 'other';
   }
 
   List<String> get _allTags => _tagsService.allTags;
@@ -87,12 +106,17 @@ class _ProjectsContentState extends State<ProjectsContent> {
                 ),
               ),
               const Spacer(),
+              _SortDropdown(
+                value: _sort,
+                onChanged: (v) => setState(() => _sort = v),
+              ),
+              const SizedBox(width: 12),
               SizedBox(
                 width: 280,
                 child: TextField(
                   style: const TextStyle(color: kTextPrimary, fontSize: 13),
                   decoration: InputDecoration(
-                    hintText: 'Search projects...',
+                    hintText: 'Search...',
                     hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
                     prefixIcon: const Icon(Icons.search, color: kTextMuted, size: 18),
                     filled: true,
@@ -161,37 +185,25 @@ class _ProjectsContentState extends State<ProjectsContent> {
                       ],
                     ),
                   )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      final cardWidth = 220.0;
-                      final spacing = 12.0;
-                      final crossAxisCount = (constraints.maxWidth / (cardWidth + spacing)).floor().clamp(1, 10);
-                      return GridView.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          mainAxisSpacing: spacing,
-                          crossAxisSpacing: spacing,
-                          childAspectRatio: 1.4,
+                : Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      for (final path in _filteredProjects)
+                        _ProjectThumbnailCard(
+                          path: path,
+                          isPinned: widget.pinnedProjects.contains(path),
+                          tags: _tagsService.tagsFor(path),
+                          onTap: widget.onSwitchProject != null
+                              ? () => widget.onSwitchProject!(path)
+                              : null,
+                          onTogglePin: widget.onTogglePin != null
+                              ? () => widget.onTogglePin!(path)
+                              : null,
+                          onAddTag: (tag) => _tagsService.addTag(path, tag),
+                          onRemoveTag: (tag) => _tagsService.removeTag(path, tag),
                         ),
-                        itemCount: _filteredProjects.length,
-                        itemBuilder: (context, index) {
-                          final path = _filteredProjects[index];
-                          final name = path.split(Platform.pathSeparator).last;
-                          final isPinned = widget.pinnedProjects.contains(path);
-                          final tags = _tagsService.tagsFor(path);
-                          return _ProjectCard(
-                            name: name,
-                            path: path,
-                            isPinned: isPinned,
-                            tags: tags,
-                            onTap: widget.onSwitchProject != null ? () => widget.onSwitchProject!(path) : null,
-                            onTogglePin: widget.onTogglePin != null ? () => widget.onTogglePin!(path) : null,
-                            onAddTag: (tag) => _tagsService.addTag(path, tag),
-                            onRemoveTag: (tag) => _tagsService.removeTag(path, tag),
-                          );
-                        },
-                      );
-                    },
+                    ],
                   ),
           ),
         ],
@@ -200,9 +212,40 @@ class _ProjectsContentState extends State<ProjectsContent> {
   }
 }
 
-class _ProjectCard extends StatefulWidget {
-  const _ProjectCard({
-    required this.name,
+class _SortDropdown extends StatelessWidget {
+  const _SortDropdown({required this.value, required this.onChanged});
+
+  final SortMode value;
+  final ValueChanged<SortMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: kGlassHighlight,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: kBorder),
+      ),
+      child: DropdownButton<SortMode>(
+        value: value,
+        underline: const SizedBox.shrink(),
+        dropdownColor: const Color(0xFF22262E),
+        style: const TextStyle(color: kTextPrimary, fontSize: 12),
+        icon: const Icon(Icons.expand_more, size: 16, color: kTextMuted),
+        items: const [
+          DropdownMenuItem(value: SortMode.name, child: Text('Name')),
+          DropdownMenuItem(value: SortMode.type, child: Text('Type')),
+          DropdownMenuItem(value: SortMode.pinned, child: Text('Pinned first')),
+        ],
+        onChanged: (v) { if (v != null) onChanged(v); },
+      ),
+    );
+  }
+}
+
+class _ProjectThumbnailCard extends StatefulWidget {
+  const _ProjectThumbnailCard({
     required this.path,
     required this.isPinned,
     required this.tags,
@@ -212,7 +255,6 @@ class _ProjectCard extends StatefulWidget {
     this.onRemoveTag,
   });
 
-  final String name;
   final String path;
   final bool isPinned;
   final List<String> tags;
@@ -222,14 +264,20 @@ class _ProjectCard extends StatefulWidget {
   final ValueChanged<String>? onRemoveTag;
 
   @override
-  State<_ProjectCard> createState() => _ProjectCardState();
+  State<_ProjectThumbnailCard> createState() => _ProjectThumbnailCardState();
 }
 
-class _ProjectCardState extends State<_ProjectCard> {
+class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
   bool _hovered = false;
+
+  static const _cardWidth = 160.0;
 
   @override
   Widget build(BuildContext context) {
+    final name = widget.path.split(Platform.pathSeparator).last;
+    final color = _colorForType(_typeOf(widget.path));
+    final thumbPath = _findThumbnail();
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -239,71 +287,59 @@ class _ProjectCardState extends State<_ProjectCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           transform: _hovered ? (Matrix4.identity()..setTranslationRaw(0, -2, 0)) : Matrix4.identity(),
-          decoration: BoxDecoration(
-            color: _hovered ? kGlassHighlight : kGlassHighlight.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: widget.isPinned
-                  ? kAccentAmber.withValues(alpha: 0.4)
-                  : _hovered ? kBorder : kBorder.withValues(alpha: 0.5),
-            ),
-          ),
-          padding: const EdgeInsets.all(14),
+          width: _cardWidth,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    widget.isPinned ? Icons.push_pin : Icons.folder_outlined,
-                    size: 18,
-                    color: widget.isPinned ? kAccentAmber : kAccentBlue,
-                  ),
-                  const Spacer(),
-                  if (widget.tags.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: kAccentAmber.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${widget.tags.length}',
-                        style: const TextStyle(color: kAccentAmber, fontSize: 9, fontWeight: FontWeight.w700),
-                      ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                height: 220,
+                width: _cardWidth,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: widget.isPinned
+                          ? kAccentAmber.withValues(alpha: 0.4)
+                          : _hovered ? kBorder : color.withValues(alpha: 0.2),
                     ),
-                ],
+                  ),
+                  child: thumbPath != null
+                      ? Image.file(File(thumbPath), fit: BoxFit.cover, alignment: Alignment.topCenter)
+                      : Icon(_iconForType(_typeOf(widget.path)), color: color, size: 40),
+                ),
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
               Text(
-                widget.name,
-                style: const TextStyle(color: kTextPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                name,
                 overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
-                widget.path,
-                style: const TextStyle(color: kTextMuted, fontSize: 10),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
+                _typeOf(widget.path),
+                style: TextStyle(color: color, fontSize: 10),
               ),
               if (widget.tags.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    for (final tag in widget.tags.take(3))
-                      _TagChip(
-                        label: tag,
-                        color: kAccentAmber,
-                        selected: false,
-                        onTap: () => widget.onRemoveTag?.call(tag),
-                      ),
-                    if (widget.tags.length > 3)
-                      Text('+${widget.tags.length - 3}', style: const TextStyle(color: kTextMuted, fontSize: 9)),
-                  ],
-                ),
+                const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      for (final tag in widget.tags)
+                        _TagChip(
+                          label: tag,
+                          color: kAccentAmber,
+                          selected: false,
+                          onTap: () => widget.onRemoveTag?.call(tag),
+                        ),
+                    ],
+                  ),
               ],
             ],
           ),
@@ -311,6 +347,38 @@ class _ProjectCardState extends State<_ProjectCard> {
       ),
     );
   }
+
+  String? _findThumbnail() {
+    for (final env in ['latex', 'typst']) {
+      final candidate = '${widget.path}${Platform.pathSeparator}.whisk'
+          '${Platform.pathSeparator}build${Platform.pathSeparator}$env'
+          '${Platform.pathSeparator}thumb.png';
+      if (File(candidate).existsSync()) return candidate;
+    }
+    return null;
+  }
+
+  String _typeOf(String path) {
+    final name = path.split(Platform.pathSeparator).last.toLowerCase();
+    if (name.endsWith('.tex')) return 'latex';
+    if (name.endsWith('.typ')) return 'typst';
+    if (name.endsWith('.mmd')) return 'mermaid';
+    return 'folder';
+  }
+
+  Color _colorForType(String type) => switch (type) {
+    'latex' => kAccentBlue,
+    'typst' => kSuccessGreen,
+    'mermaid' => kAccentAmber,
+    _ => const Color(0xFF5A6570),
+  };
+
+  IconData _iconForType(String type) => switch (type) {
+    'latex' => Icons.functions,
+    'typst' => Icons.description_outlined,
+    'mermaid' => Icons.account_tree_outlined,
+    _ => Icons.folder_outlined,
+  };
 
   void _showContextMenu(BuildContext context, Offset position) {
     showMenu<String>(

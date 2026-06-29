@@ -201,16 +201,11 @@ class WorkspaceViewModel extends ChangeNotifier {
       return;
     }
 
-    final cached = _renderResultCache[_activeFile.path];
-    if (cached != null && cached.state == RenderState.success && cached.pdfPath != null) {
-      final pdfFile = File(cached.pdfPath!);
-      final sourceFile = File(_activeFile.path);
-      final pdfExists = await pdfFile.exists();
-      final sourceExists = await sourceFile.exists();
-      if (pdfExists && sourceExists) {
-        final pdfMod = await pdfFile.lastModified();
-        final srcMod = await sourceFile.lastModified();
-        if (!pdfMod.isBefore(srcMod)) {
+    if (!_activeFile.isDirty) {
+      final cached = _renderResultCache[_activeFile.path];
+      if (cached != null && cached.state == RenderState.success && cached.pdfPath != null) {
+        final pdfFile = File(cached.pdfPath!);
+        if (await pdfFile.exists()) {
           _renderResult = cached;
           notifyListeners();
           return;
@@ -219,7 +214,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     }
 
     final existingPdf = await _findExistingPdf(_activeFile.path, envId);
-    if (existingPdf != null) {
+    if (existingPdf != null && !_activeFile.isDirty) {
       final result = RenderResult.success(pdfPath: existingPdf, engine: envId, log: '');
       _renderResult = result;
       _renderResultCache[_activeFile.path] = result;
@@ -275,6 +270,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (!_canWriteLocalFiles) {
       await _saveGuestDraftActiveFile();
       _activeFile = _activeFile.copyWith(isDirty: false);
+      _renderResultCache.remove(_activeFile.path);
       _replaceFileInLists(_activeFile);
       notifyListeners();
       return;
@@ -284,6 +280,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     await file.parent.create(recursive: true);
     await file.writeAsString(_activeFile.content);
     _activeFile = _activeFile.copyWith(isDirty: false);
+    _renderResultCache.remove(_activeFile.path);
     _replaceFileInLists(_activeFile);
     notifyListeners();
   }

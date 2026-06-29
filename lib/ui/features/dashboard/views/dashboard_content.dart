@@ -454,8 +454,7 @@ class _RecentProjectCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onRemove;
 
-  static const _cardWidth = 150.0;
-  static const _cardHeight = 210.0;
+  static const _cardWidth = 160.0;
 
   @override
   Widget build(BuildContext context) {
@@ -469,57 +468,43 @@ class _RecentProjectCard extends StatelessWidget {
   Widget _buildThumbnailPreview(BuildContext context, String path) {
     return SizedBox(
       width: _cardWidth,
-      height: _cardHeight,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Stack(
-              clipBehavior: Clip.hardEdge,
-              children: [
-                Positioned.fill(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  height: 200,
+                  width: _cardWidth,
                   child: Image.file(
                     File(path),
                     fit: BoxFit.cover,
                     alignment: Alignment.topCenter,
                   ),
                 ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          kAppBlack.withValues(alpha: 0.85),
-                          kAppBlack.withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
-                    child: Text(
-                      project.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: kTextPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                project.name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                project.type,
+                style: TextStyle(color: _colorForType(project.type), fontSize: 10),
+              ),
+            ],
           ),
         ),
       ),
@@ -531,41 +516,41 @@ class _RecentProjectCard extends StatelessWidget {
     final icon = _iconForType(project.type);
     return SizedBox(
       width: _cardWidth,
-      height: _cardHeight,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
-          child: Container(
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withValues(alpha: 0.2)),
-            ),
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: color, size: 24),
-                const Spacer(),
-                Text(
-                  project.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: kTextPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 220,
+                width: _cardWidth,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  project.type,
-                  style: TextStyle(color: color, fontSize: 11),
+                child: Icon(icon, color: color, size: 40),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                project.name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                project.type,
+                style: TextStyle(color: color, fontSize: 10),
+              ),
+            ],
           ),
         ),
       ),

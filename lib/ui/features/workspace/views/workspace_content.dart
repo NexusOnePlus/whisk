@@ -49,6 +49,7 @@ class _WorkspaceContentState extends State<WorkspaceContent>
   List<int> _findMatches = const [];
   int _revealRevision = 0;
   int? _revealOffset;
+  Timer? _renderDebounce;
 
   WorkspaceViewModel get viewModel => widget.viewModel;
 
@@ -68,6 +69,9 @@ class _WorkspaceContentState extends State<WorkspaceContent>
     _findFocusNode = FocusNode();
     _controller.addListener(() {});
     viewModel.addListener(_onViewModelChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) viewModel.renderActiveFile();
+    });
   }
 
   @override
@@ -84,6 +88,7 @@ class _WorkspaceContentState extends State<WorkspaceContent>
 
   @override
   void dispose() {
+    _renderDebounce?.cancel();
     _glowController.dispose();
     viewModel.removeListener(_onViewModelChanged);
     _controller.dispose();
@@ -105,6 +110,10 @@ class _WorkspaceContentState extends State<WorkspaceContent>
 
   void _handleEditorChanged(String content) {
     viewModel.updateActiveContent(content);
+    _renderDebounce?.cancel();
+    _renderDebounce = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) viewModel.renderActiveFile();
+    });
   }
 
   void _toggleFind() {
@@ -211,35 +220,37 @@ class _WorkspaceContentState extends State<WorkspaceContent>
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      EditorNavbar(
-                        onCloseWorkspace: widget.onCloseWorkspace ?? () {},
-                        onAbout: widget.onAbout,
-                        onShowLogs: _showLogs,
-                      ),
-                      const SizedBox(height: 6),
-                      Expanded(
-                        child: EditorContentFrame(
-                          viewModel: viewModel,
-                          controller: _controller,
-                          editorFocusNode: _editorFocusNode,
-                          onEditorChanged: _handleEditorChanged,
-                          revealRevision: _revealRevision,
-                          revealOffset: _revealOffset,
-                          findOpen: _findOpen,
-                          findController: _findController,
-                          findFocusNode: _findFocusNode,
-                          findMatches: _findMatches,
-                          findCursor: _findCursor,
-                          onToggleFind: _toggleFind,
-                          onRefreshFind: _refreshFindMatches,
-                          onMoveFind: _moveFind,
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        EditorNavbar(
+                          onCloseWorkspace: widget.onCloseWorkspace ?? () {},
+                          onAbout: widget.onAbout,
+                          onShowLogs: _showLogs,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: EditorContentFrame(
+                            viewModel: viewModel,
+                            controller: _controller,
+                            editorFocusNode: _editorFocusNode,
+                            onEditorChanged: _handleEditorChanged,
+                            revealRevision: _revealRevision,
+                            revealOffset: _revealOffset,
+                            findOpen: _findOpen,
+                            findController: _findController,
+                            findFocusNode: _findFocusNode,
+                            findMatches: _findMatches,
+                            findCursor: _findCursor,
+                            onToggleFind: _toggleFind,
+                            onRefreshFind: _refreshFindMatches,
+                            onMoveFind: _moveFind,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

@@ -51,7 +51,10 @@ class _AppShellState extends State<AppShell> {
                   pinnedProjects: viewModel.pinnedProjects,
                   selectedTab: _railTab,
                   isInWorkspace: isWorkspace,
-                  onSelectTab: (tab) => setState(() => _railTab = tab),
+                  onSelectTab: (tab) {
+                    if (isWorkspace) viewModel.closeWorkspace();
+                    setState(() => _railTab = tab);
+                  },
                   onSwitchProject: viewModel.switchToProject,
                   onTogglePin: viewModel.togglePinProject,
                   onSettings: _showSettings,
@@ -127,8 +130,7 @@ class _SettingsDialog extends StatefulWidget {
 }
 
 class _SettingsDialogState extends State<_SettingsDialog> {
-  late final TextEditingController _nameController;
-  String _profileName = '';
+  final _nameController = TextEditingController();
 
   @override
   void initState() {
@@ -144,11 +146,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     if (await file.exists()) {
       try {
         final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-        _profileName = data['profileName'] as String? ?? '';
+        final name = data['profileName'] as String? ?? '';
+        _nameController.text = name;
       } catch (_) {}
     }
-    _nameController = TextEditingController(text: _profileName);
-    setState(() {});
   }
 
   @override

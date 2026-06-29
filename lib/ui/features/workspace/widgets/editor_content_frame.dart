@@ -51,8 +51,7 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
   @override
   Widget build(BuildContext context) {
     final vm = widget.viewModel;
-    return Expanded(
-      child: ClipRRect(
+    return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Container(
           child: Row(
@@ -127,8 +126,7 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
