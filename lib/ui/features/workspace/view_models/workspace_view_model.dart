@@ -280,8 +280,24 @@ class WorkspaceViewModel extends ChangeNotifier {
     await file.writeAsString(_activeFile.content);
     _activeFile = _activeFile.copyWith(isDirty: false);
     _renderResultCache.remove(_activeFile.path);
+    await _deleteExistingPdf(_activeFile.path, selectedEnvironment.id);
     _replaceFileInLists(_activeFile);
     notifyListeners();
+  }
+
+  Future<void> _deleteExistingPdf(String sourcePath, String envId) async {
+    final projectRoot = _activeFile.projectRoot;
+    if (projectRoot == null) return;
+    final pdfName = sourcePath.split(Platform.pathSeparator).last.replaceAll(
+      RegExp(r'\.(typ|tex)$', caseSensitive: false), '.pdf',
+    );
+    final pdfPath = '$projectRoot${Platform.pathSeparator}.whisk'
+        '${Platform.pathSeparator}build${Platform.pathSeparator}$envId'
+        '${Platform.pathSeparator}$pdfName';
+    final pdfFile = File(pdfPath);
+    if (await pdfFile.exists()) {
+      try { await pdfFile.delete(); } catch (_) {}
+    }
   }
 
   Future<String?> createCollaborationInvite() async {
