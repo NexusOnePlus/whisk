@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:whisk/data/services/engine_provision_service.dart';
+import 'package:whisk/data/services/workspace_config_service.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 
@@ -36,45 +37,55 @@ class DocumentRenderService {
     await source.writeAsString(file.content);
 
     final tectonic = await engineProvisionService.ensureTectonic();
+    final preferredEngine = workspace.config.latexEngine;
     final attempts = <_RenderAttempt>[];
 
-    if (tectonic.available && tectonic.executablePath != null) {
+    if (preferredEngine == 'auto' || preferredEngine == 'tectonic') {
+      if (tectonic.available && tectonic.executablePath != null) {
+        attempts.add(
+          _RenderAttempt(
+            engine: 'tectonic',
+            executable: tectonic.executablePath!,
+            arguments: [
+              workspace.entrypoint,
+              '--outdir',
+              workspace.buildArgument,
+            ],
+          ),
+        );
+      }
+    }
+
+    if (preferredEngine == 'auto' || preferredEngine == 'latexmk') {
       attempts.add(
         _RenderAttempt(
-          engine: 'tectonic',
-          executable: tectonic.executablePath!,
+          engine: 'latexmk',
+          executable: 'latexmk',
           arguments: [
+            '-pdf',
+            '-interaction=nonstopmode',
+            '-halt-on-error',
+            '-outdir=${workspace.buildArgument}',
             workspace.entrypoint,
-            '--outdir',
-            workspace.buildArgument,
           ],
         ),
       );
     }
 
-    attempts.addAll([
-      _RenderAttempt(
-        engine: 'latexmk',
-        executable: 'latexmk',
-        arguments: [
-          '-pdf',
-          '-interaction=nonstopmode',
-          '-halt-on-error',
-          '-outdir=${workspace.buildArgument}',
-          workspace.entrypoint,
-        ],
-      ),
-      _RenderAttempt(
-        engine: 'pdflatex',
-        executable: 'pdflatex',
-        arguments: [
-          '-interaction=nonstopmode',
-          '-halt-on-error',
-          '-output-directory=${workspace.buildArgument}',
-          workspace.entrypoint,
-        ],
-      ),
-    ]);
+    if (preferredEngine == 'auto' || preferredEngine == 'pdflatex') {
+      attempts.add(
+        _RenderAttempt(
+          engine: 'pdflatex',
+          executable: 'pdflatex',
+          arguments: [
+            '-interaction=nonstopmode',
+            '-halt-on-error',
+            '-output-directory=${workspace.buildArgument}',
+            workspace.entrypoint,
+          ],
+        ),
+      );
+    }
 
     final logs = StringBuffer();
     logs
@@ -120,6 +131,13 @@ class DocumentRenderService {
 
     final source = File(workspace.sourcePath);
     await source.writeAsString(file.content);
+
+    final preferredEngine = workspace.config.typstEngine;
+    if (preferredEngine != 'auto' && preferredEngine != 'typst') {
+      return RenderResult.failed(
+        'Typst engine "$preferredEngine" is not supported. Use "auto" or "typst".',
+      );
+    }
 
     final typst = await engineProvisionService.ensureTypst();
     final logs = StringBuffer();
@@ -226,6 +244,10 @@ class DocumentRenderService {
         ? await Directory.systemTemp.createTemp('whisk-draft-$engine-')
         : Directory(file.projectRoot!);
 
+    final config = file.projectRoot != null
+        ? await WorkspaceConfig.load(file.projectRoot!)
+        : WorkspaceConfig.defaultConfig;
+
     final whiskRoot = Directory(
       '${projectRoot.path}${Platform.pathSeparator}.whisk',
     );
@@ -273,6 +295,7 @@ class DocumentRenderService {
       entrypoint: entrypoint,
       buildArgument: buildRoot.path,
       environment: env,
+      config: config,
     );
   }
 
@@ -300,6 +323,7 @@ class _RenderWorkspace {
     required this.entrypoint,
     required this.buildArgument,
     required this.environment,
+    required this.config,
   });
 
   final Directory projectRoot;
@@ -309,6 +333,7 @@ class _RenderWorkspace {
   final String entrypoint;
   final String buildArgument;
   final Map<String, String> environment;
+  final WorkspaceConfig config;
 }
 
 class _RenderAttempt {
