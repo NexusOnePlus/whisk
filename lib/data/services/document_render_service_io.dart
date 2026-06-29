@@ -256,6 +256,7 @@ class DocumentRenderService {
     final env = <String, String>{
       'WHISK_CACHE_DIR': cacheRoot.path,
       'TYPST_PACKAGE_CACHE': '${cacheRoot.path}${Platform.pathSeparator}typst',
+      'FONTCONFIG_FILE': '',
     };
     if (engine == 'latex') {
       env.addAll({
