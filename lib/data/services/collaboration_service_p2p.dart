@@ -273,7 +273,9 @@ class CollaborationServiceP2p
           insertedText: update.operation.insertedText,
         ),
       );
-    } catch (_) {}
+    } catch (e) {
+      LogBuffer.writeln(LogCategory.collab, '[collab] CRDT local edit failed: $e');
+    }
     _broadcastCrdtUpdate(update.filePath, operation: update.operation);
     _transport.broadcastTextUpdate(update);
   }
@@ -290,7 +292,9 @@ class CollaborationServiceP2p
           insertedText: update.operation.insertedText,
         ),
       );
-    } catch (_) {}
+    } catch (e) {
+      LogBuffer.writeln(LogCategory.collab, '[collab] CRDT remote edit failed: $e');
+    }
     _textController.add(update);
   }
 

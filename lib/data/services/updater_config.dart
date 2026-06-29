@@ -1,8 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:yaml/yaml.dart';
+
+import 'dart:developer' as dev;
 
 class UpdaterConfig {
   const UpdaterConfig({
@@ -41,7 +42,9 @@ class UpdaterConfig {
           showReleaseNotes: updater['show_release_notes'] ?? true,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      dev.log('Failed to load updater config: $e', name: 'UpdaterConfig');
+    }
 
     return const UpdaterConfig(
       repoOwner: 'NexusOnePlus',

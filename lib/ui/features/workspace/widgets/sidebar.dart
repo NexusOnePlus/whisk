@@ -486,12 +486,14 @@ class _FolderRow extends StatelessWidget {
                   ),
                 ),
               ),
-              InkWell(
-                borderRadius: BorderRadius.circular(6),
-                onTap: () => _showAddMenu(context),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.add, size: 16, color: kTextMuted),
+              Builder(
+                builder: (btnContext) => InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () => _showAddMenu(btnContext),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.add, size: 16, color: kTextMuted),
+                  ),
                 ),
               ),
             ],
@@ -502,9 +504,18 @@ class _FolderRow extends StatelessWidget {
   }
 
   void _showAddMenu(BuildContext context) {
+    final box = context.findRenderObject() as RenderBox?;
+    final position = box != null
+        ? box.localToGlobal(Offset(box.size.width, 0))
+        : Offset.zero;
     showMenu<String>(
       context: context,
-      position: RelativeRect.fill,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
+      ),
       items: const [
         PopupMenuItem(value: 'file', height: 32, child: Text('New File', style: TextStyle(fontSize: 13))),
         PopupMenuItem(value: 'folder', height: 32, child: Text('New Folder', style: TextStyle(fontSize: 13))),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -52,7 +53,9 @@ class AppWindowService {
       final path = await _filePath;
       final file = File(path);
       await file.writeAsString(json.encode(state));
-    } catch (_) {}
+    } catch (e) {
+      dev.log('Failed to save window state: $e', name: 'AppWindowService');
+    }
   }
 
   static Future<_WindowState?> _loadWindowState() async {

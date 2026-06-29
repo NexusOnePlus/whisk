@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'dart:developer' as dev;
+
 class SettingsService extends ChangeNotifier {
   SettingsService._();
   static SettingsService? _instance;
@@ -24,7 +26,9 @@ class SettingsService extends ChangeNotifier {
         final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
         _profileName = data['profileName'] as String? ?? '';
       }
-    } catch (_) {}
+    } catch (e) {
+      dev.log('Failed to load settings: $e', name: 'SettingsService');
+    }
     _loaded = true;
     notifyListeners();
   }
@@ -42,7 +46,9 @@ class SettingsService extends ChangeNotifier {
       await file.writeAsString(jsonEncode({
         'profileName': _profileName,
       }));
-    } catch (_) {}
+    } catch (e) {
+      dev.log('Failed to save settings: $e', name: 'SettingsService');
+    }
   }
 
   static Future<Directory> _appSettingsDir() async {
