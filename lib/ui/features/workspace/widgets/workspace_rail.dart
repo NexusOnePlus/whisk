@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
+import 'package:whisk/ui/features/workspace/widgets/settings_dialog.dart';
 import 'package:window_manager/window_manager.dart';
 
 class WorkspaceRail extends StatefulWidget {
@@ -148,7 +149,12 @@ class _WorkspaceRailState extends State<WorkspaceRail> {
             _RailButton(
               icon: Icons.settings_outlined,
               label: 'Settings',
-              onPressed: () {},
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const SettingsDialog(),
+                );
+              },
             ),
           ],
         ),

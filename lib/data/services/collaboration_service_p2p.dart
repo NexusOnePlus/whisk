@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
 
@@ -22,7 +23,7 @@ class CollaborationServiceP2p
     Color? peerColor,
     CollaborationTransport? transport,
   }) : peerId = peerId ?? _createPeerId(),
-       peerName = peerName ?? 'Local ${_nextPeerNumber()}',
+       peerName = peerName ?? _defaultPeerName(),
        peerColor = peerColor ?? _palette[_random.nextInt(_palette.length)],
        _transport = transport ?? LocalCollaborationTransport(),
        _useRustEngine = true;
@@ -34,13 +35,12 @@ class CollaborationServiceP2p
     Color? peerColor,
     CollaborationTransport? transport,
   }) : peerId = peerId ?? _createPeerId(),
-       peerName = peerName ?? 'Local ${_nextPeerNumber()}',
+       peerName = peerName ?? _defaultPeerName(),
        peerColor = peerColor ?? _palette[_random.nextInt(_palette.length)],
        _transport = transport ?? LocalCollaborationTransport(),
        _useRustEngine = false;
 
   static final _random = Random();
-  static var _peerCounter = 0;
   static const _palette = [
     Colors.purpleAccent,
     Colors.lightGreenAccent,
@@ -48,6 +48,17 @@ class CollaborationServiceP2p
     Colors.cyanAccent,
     Colors.pinkAccent,
   ];
+
+  static String _defaultPeerName() {
+    if (Platform.isWindows) {
+      final user = Platform.environment['USERNAME'];
+      if (user != null && user.isNotEmpty) return user;
+    } else {
+      final user = Platform.environment['USER'];
+      if (user != null && user.isNotEmpty) return user;
+    }
+    return 'User';
+  }
 
   final _peerController = StreamController<List<CollaborationPeer>>.broadcast();
   final _fileController =
@@ -296,11 +307,6 @@ class CollaborationServiceP2p
     final micros = DateTime.now().microsecondsSinceEpoch;
     final salt = _random.nextInt(1 << 32);
     return 'peer-$micros-$salt';
-  }
-
-  static int _nextPeerNumber() {
-    _peerCounter += 1;
-    return _peerCounter;
   }
 
   void _broadcastCrdtUpdate(

@@ -8,16 +8,20 @@ class EditorNavbar extends StatelessWidget {
     this.onCreateInvite,
     this.onJoinInvite,
     this.onImportFile,
+    this.onExportPdf,
     this.onAbout,
     this.onShowLogs,
+    this.canExportPdf = false,
   });
 
   final VoidCallback onCloseWorkspace;
   final VoidCallback? onCreateInvite;
   final VoidCallback? onJoinInvite;
   final VoidCallback? onImportFile;
+  final VoidCallback? onExportPdf;
   final VoidCallback? onAbout;
   final VoidCallback? onShowLogs;
+  final bool canExportPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +46,12 @@ class EditorNavbar extends StatelessWidget {
                 label: 'Import file',
                 onTap: onImportFile,
               ),
+              if (canExportPdf)
+                _NavBarMenuItem(
+                  icon: Icons.picture_as_pdf_outlined,
+                  label: 'Export to PDF',
+                  onTap: onExportPdf,
+                ),
             ],
           ),
           _NavBarDropdown(

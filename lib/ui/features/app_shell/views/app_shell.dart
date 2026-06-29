@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/app_shell/view_models/app_shell_view_model.dart';
 import 'package:whisk/ui/features/app_shell/widgets/about_dialog.dart' as whisk;
 import 'package:whisk/ui/features/dashboard/views/dashboard_screen.dart';
@@ -31,7 +32,7 @@ class _AppShellState extends State<AppShell> {
     return ListenableBuilder(
       listenable: viewModel,
       builder: (context, _) {
-        return switch (viewModel.mode) {
+        final content = switch (viewModel.mode) {
           AppShellMode.dashboard => DashboardScreen(
             recentProjects: viewModel.recentProjects,
             onOpenDraftWorkspace: (int i) => viewModel.openDraftWorkspace(i),
@@ -68,6 +69,43 @@ class _AppShellState extends State<AppShell> {
             viewModel: viewModel,
           ),
         };
+
+        return Stack(
+          children: [
+            content,
+            if (viewModel.isJoining)
+              Container(
+                color: kAppBlack.withValues(alpha: 0.8),
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        color: kAccentBlue,
+                        strokeWidth: 2,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Joining session...',
+                        style: TextStyle(
+                          color: kTextSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Syncing project files',
+                        style: TextStyle(
+                          color: kTextMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
       },
     );
   }

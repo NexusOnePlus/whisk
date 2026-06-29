@@ -14,7 +14,7 @@ ThemeData buildWhiskTheme() {
       outline: kBorder,
     ),
     scaffoldBackgroundColor: kAppBlack,
-    fontFamily: 'Inter',
+    fontFamily: 'Figtree',
     fontFamilyFallback: const ['Segoe UI', 'sans-serif'],
     cardTheme: CardThemeData(
       color: kGlassBase.withValues(alpha: 0.7),
@@ -29,7 +29,7 @@ ThemeData buildWhiskTheme() {
     textTheme: ThemeData.dark().textTheme.apply(
       bodyColor: kTextPrimary,
       displayColor: kTextPrimary,
-      fontFamily: 'Inter',
+      fontFamily: 'Figtree',
     ),
   );
 }

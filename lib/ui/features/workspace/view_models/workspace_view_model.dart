@@ -8,6 +8,7 @@ import 'package:whisk/data/repositories/environment_catalog.dart';
 import 'package:whisk/data/services/collaboration_service.dart';
 import 'package:whisk/data/services/document_render_service.dart';
 import 'package:whisk/data/services/file_watcher_service.dart';
+import 'package:whisk/data/services/invite_codec.dart';
 import 'package:whisk/data/services/project_open_service.dart';
 import 'package:whisk/domain/models/collaboration_file_entry.dart';
 import 'package:whisk/domain/models/environment_kind.dart';
@@ -268,8 +269,10 @@ class WorkspaceViewModel extends ChangeNotifier {
 
   Future<bool> joinCollaborationInvite(String invite) async {
     if (_disposed) return false;
+    final payload = InviteCodec.decode(invite);
+    final ticket = payload?.ticket ?? invite;
     final joined =
-        await (collaborationService?.joinInvite(invite) ?? Future.value(false));
+        await (collaborationService?.joinInvite(ticket) ?? Future.value(false));
     if (joined) notifyListeners();
     return joined;
   }

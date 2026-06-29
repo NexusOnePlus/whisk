@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:whisk/data/services/invite_codec.dart';
+import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
+import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/ui/core/ambient_glow_painter.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/editor/logic/whisk_editor_controller.dart';
@@ -207,14 +212,19 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   Future<void> _createCollaborationInvite() async {
     final messenger = ScaffoldMessenger.of(context);
-    final invite = await viewModel.createCollaborationInvite();
+    final rawInvite = await viewModel.createCollaborationInvite();
     if (!mounted) return;
-    if (invite == null || invite.isEmpty) {
+    if (rawInvite == null || rawInvite.isEmpty) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Unable to create collaboration invite')),
       );
       return;
     }
+
+    final hostName = SettingsService.instance.profileName.isNotEmpty
+        ? SettingsService.instance.profileName
+        : 'Host';
+    final invite = InviteCodec.encode(ticket: rawInvite, hostName: hostName);
 
     await Clipboard.setData(ClipboardData(text: invite));
     if (!mounted) return;
@@ -248,6 +258,67 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     showDialog(
       context: context,
       builder: (context) => const LogViewerDialog(),
+    );
+  }
+
+  bool get _canExportPdf {
+    final envId = viewModel.selectedEnvironment.id;
+    return envId == 'latex' || envId == 'typst';
+  }
+
+  Future<void> _exportToPdf() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (viewModel.renderResult.state != RenderState.success ||
+        viewModel.renderResult.pdfPath == null) {
+      _flushPendingContent();
+      await viewModel.saveActiveFile();
+      await viewModel.renderActiveFile();
+      if (!mounted) return;
+      if (viewModel.renderResult.state != RenderState.success ||
+          viewModel.renderResult.pdfPath == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Compilation failed. Fix errors and try again.')),
+        );
+        return;
+      }
+    }
+
+    final pdfPath = viewModel.renderResult.pdfPath!;
+    final pdfFile = File(pdfPath);
+    if (!await pdfFile.exists()) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('PDF file not found')),
+      );
+      return;
+    }
+
+    final result = await FilePicker.saveFile(
+      dialogTitle: 'Export PDF',
+      fileName: '${viewModel.activeFile.name.replaceAll(RegExp(r'\.[^.]+$'), '')}.pdf',
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+
+    if (!mounted || result == null) return;
+
+    final destFile = File(result);
+    await pdfFile.copy(destFile.path);
+
+    if (!mounted) return;
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('PDF exported to ${destFile.path}'),
+        action: SnackBarAction(
+          label: 'Copy path',
+          textColor: kAccentBlue,
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: destFile.path));
+          },
+        ),
+        duration: const Duration(seconds: 4),
+      ),
     );
   }
 
@@ -367,6 +438,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                                   onCloseWorkspace: widget.onCloseWorkspace,
                                   onCreateInvite: _createCollaborationInvite,
                                   onJoinInvite: _joinCollaborationInvite,
+                                  onImportFile: null,
+                                  onExportPdf: _canExportPdf ? _exportToPdf : null,
+                                  canExportPdf: _canExportPdf,
                                   onAbout: widget.onAbout,
                                   onShowLogs: _showLogs,
                                 ),

@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:whisk/data/repositories/environment_catalog.dart';
 import 'package:whisk/data/services/collaboration_service_p2p.dart';
+import 'package:whisk/data/services/invite_codec.dart';
 import 'package:whisk/data/services/pinned_project_service.dart';
 import 'package:whisk/data/services/project_open_service.dart';
 import 'package:whisk/data/services/recent_project_service.dart';
+import 'package:whisk/data/services/settings_service.dart';
+import 'package:whisk/data/services/workspace_config_service.dart';
 import 'package:whisk/domain/models/recent_project.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
@@ -18,6 +22,7 @@ class AppShellViewModel extends ChangeNotifier {
     _recentProjectService.load();
     _pinnedProjectService.addListener(_onPinnedChanged);
     _pinnedProjectService.load();
+    SettingsService.instance.load();
   }
 
   final RecentProjectService _recentProjectService = RecentProjectService();
@@ -48,8 +53,10 @@ class AppShellViewModel extends ChangeNotifier {
   final List<String> _openProjectPaths = [];
   var _localPeerSequence = 0;
   var _disposed = false;
+  bool _isJoining = false;
 
   AppShellMode get mode => _mode;
+  bool get isJoining => _isJoining;
   WorkspaceViewModel? get workspaceViewModel => _workspaceViewModel;
   String? get activeWorkspaceTitle {
     final workspace = _workspaceViewModel;
@@ -81,7 +88,11 @@ class AppShellViewModel extends ChangeNotifier {
     _workspaceViewModel?.dispose();
     _workspaceViewModel = WorkspaceViewModel(
       startEnvIndex: envIndex,
-      collaborationService: CollaborationServiceP2p(),
+      collaborationService: CollaborationServiceP2p(
+        peerName: SettingsService.instance.profileName.isNotEmpty
+            ? SettingsService.instance.profileName
+            : null,
+      ),
     );
     _addOpenProject(rootPath);
     _mode = AppShellMode.workspace;
@@ -162,6 +173,7 @@ class AppShellViewModel extends ChangeNotifier {
 
     final rootPath = project.rootPath;
     _saveRecentForPath(rootPath, 'folder', lastFilePath: project.entryFile.path);
+    unawaited(WorkspaceConfig.ensureDefaults(rootPath));
 
     final envIndex = const EnvironmentCatalog().listEnvironments().indexWhere(
       (e) => e.extension == project.entryFile.extension,
@@ -176,7 +188,11 @@ class AppShellViewModel extends ChangeNotifier {
       initialFile: project.entryFile,
       projectFiles: project.files,
       startEnvIndex: envIndex >= 0 ? envIndex : 0,
-      collaborationService: CollaborationServiceP2p(),
+      collaborationService: CollaborationServiceP2p(
+        peerName: SettingsService.instance.profileName.isNotEmpty
+            ? SettingsService.instance.profileName
+            : null,
+      ),
     );
     _workspaceViewModel = workspace;
     _addOpenProject(rootPath);
@@ -188,15 +204,28 @@ class AppShellViewModel extends ChangeNotifier {
 
   Future<bool> joinSharedWorkspace(String invite) async {
     if (_disposed) return false;
-    final service = CollaborationServiceP2p(peerName: 'Guest');
+    _isJoining = true;
+    notifyListeners();
+
+    final payload = InviteCodec.decode(invite);
+    final ticket = payload?.ticket ?? invite;
+
+    final guestName = SettingsService.instance.profileName.isNotEmpty
+        ? SettingsService.instance.profileName
+        : (payload?.hostName.isNotEmpty == true ? 'Guest of ${payload!.hostName}' : 'Guest');
+    final service = CollaborationServiceP2p(peerName: guestName);
     await service.connect('guest-${DateTime.now().microsecondsSinceEpoch}');
     if (_disposed) {
       await service.disconnect();
+      _isJoining = false;
+      notifyListeners();
       return false;
     }
-    final joined = await service.joinInvite(invite);
+    final joined = await service.joinInvite(ticket);
     if (!joined) {
       await service.disconnect();
+      _isJoining = false;
+      notifyListeners();
       return false;
     }
 
@@ -204,6 +233,8 @@ class AppShellViewModel extends ChangeNotifier {
     final remoteFiles = await service.requestRemoteFiles();
     if (_disposed) {
       await service.disconnect();
+      _isJoining = false;
+      notifyListeners();
       return false;
     }
     final files = remoteFiles.isEmpty
@@ -236,6 +267,7 @@ class AppShellViewModel extends ChangeNotifier {
       collaborationService: service,
     );
     _mode = AppShellMode.workspace;
+    _isJoining = false;
     notifyListeners();
     return true;
   }
@@ -289,6 +321,7 @@ class AppShellViewModel extends ChangeNotifier {
     if (_disposed) return;
     final root = Directory(project.path);
     if (!await root.exists()) return;
+    unawaited(WorkspaceConfig.ensureDefaults(project.path));
 
     final diskProject = await _projectOpenService.pickProjectFromPath(project.path);
     if (_disposed) return;
@@ -328,7 +361,11 @@ class AppShellViewModel extends ChangeNotifier {
       initialFile: initialFile,
       projectFiles: diskProject.files,
       startEnvIndex: envIndex >= 0 ? envIndex : 0,
-      collaborationService: CollaborationServiceP2p(),
+      collaborationService: CollaborationServiceP2p(
+        peerName: SettingsService.instance.profileName.isNotEmpty
+            ? SettingsService.instance.profileName
+            : null,
+      ),
     );
     _workspaceViewModel = workspace;
     _addOpenProject(project.path);

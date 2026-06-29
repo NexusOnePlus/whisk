@@ -268,6 +268,7 @@ class _FilesSectionState extends State<_FilesSection> {
             icon: _iconFor(projectFile),
             label: projectFile.name,
             detail: '',
+            filePath: projectFile.path,
             selected: widget.file.path == projectFile.path,
             onTap: () => widget.onOpenFile(projectFile),
             onDelete: widget.file.projectRoot != null
@@ -319,6 +320,7 @@ class _FilesSectionState extends State<_FilesSection> {
               icon: _iconFor(file),
               label: file.name,
               detail: '',
+              filePath: file.path,
               selected: widget.file.path == file.path,
               onTap: () => widget.onOpenFile(file),
               onDelete: widget.file.projectRoot != null
@@ -546,6 +548,7 @@ class _FileRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.detail,
+    this.filePath,
     this.selected = false,
     this.onTap,
     this.onDelete,
@@ -554,6 +557,7 @@ class _FileRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String detail;
+  final String? filePath;
   final bool selected;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
@@ -613,6 +617,18 @@ class _FileRow extends StatelessWidget {
       ),
       color: const Color(0xFF22262E),
       items: [
+        if (filePath != null)
+          PopupMenuItem(
+            value: 'reveal',
+            height: 36,
+            child: Row(
+              children: [
+                Icon(Icons.folder_open, size: 16, color: kTextSecondary),
+                SizedBox(width: 8),
+                Text('Reveal in file explorer', style: TextStyle(color: kTextPrimary, fontSize: 13)),
+              ],
+            ),
+          ),
         PopupMenuItem(
           value: 'delete',
           height: 36,
@@ -626,8 +642,15 @@ class _FileRow extends StatelessWidget {
         ),
       ],
     ).then((value) {
+      if (value == 'reveal' && filePath != null) {
+        _revealInExplorer(filePath!);
+      }
       if (value == 'delete') onDelete?.call();
     });
+  }
+
+  void _revealInExplorer(String path) {
+    Process.run('explorer', ['/select,$path']);
   }
 }
 

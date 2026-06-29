@@ -1,6 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:whisk/data/services/update_service.dart';
 import 'package:whisk/data/services/updater_config.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
@@ -16,6 +17,9 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
   String _version = '...';
   UpdateInfo? _updateInfo;
   bool _checking = false;
+  bool _downloading = false;
+  bool _installing = false;
+  double _downloadProgress = 0;
   String _status = '';
 
   @override
@@ -58,6 +62,64 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
         _status = 'You are up to date';
       }
     });
+  }
+
+  Future<void> _downloadAndInstall() async {
+    if (_updateInfo == null) return;
+
+    setState(() {
+      _downloading = true;
+      _downloadProgress = 0;
+      _status = 'Downloading...';
+    });
+
+    final config = await UpdaterConfig.load();
+    final service = UpdateService(
+      repoOwner: config.repoOwner,
+      repoName: config.repoName,
+    );
+
+    final file = await service.downloadUpdate(
+      _updateInfo!,
+      onProgress: (progress) {
+        if (!mounted) return;
+        setState(() => _downloadProgress = progress);
+      },
+    );
+
+    if (!mounted) return;
+
+    if (file == null) {
+      setState(() {
+        _downloading = false;
+        _status = 'Download failed';
+      });
+      return;
+    }
+
+    setState(() {
+      _downloading = false;
+      _installing = true;
+      _status = 'Installing...';
+    });
+
+    final installed = await service.installUpdate(file);
+
+    if (!mounted) return;
+
+    if (installed) {
+      setState(() {
+        _installing = false;
+        _status = 'Installed! Restarting...';
+      });
+      await Future.delayed(const Duration(seconds: 1));
+      exit(0);
+    } else {
+      setState(() {
+        _installing = false;
+        _status = 'Installation failed';
+      });
+    }
   }
 
   @override
@@ -133,7 +195,9 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _checking ? null : _checkForUpdates,
+              onPressed: (_checking || _downloading || _installing)
+                  ? null
+                  : _checkForUpdates,
               icon: _checking
                   ? const SizedBox(
                       width: 14,
@@ -152,7 +216,7 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
               ),
             ),
           ),
-          if (_status.isNotEmpty && _updateInfo == null) ...[
+          if (_status.isNotEmpty && _updateInfo == null && !_downloading && !_installing) ...[
             const SizedBox(height: 8),
             Text(
               _status,
@@ -162,17 +226,58 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
               ),
             ),
           ],
-          if (_updateInfo != null) ...[
+          if (_downloading) ...[
+            const SizedBox(height: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _status,
+                  style: const TextStyle(color: kTextSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _downloadProgress,
+                    backgroundColor: kBorder,
+                    valueColor: AlwaysStoppedAnimation<Color>(kAccentBlue),
+                    minHeight: 6,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${(_downloadProgress * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(color: kTextMuted, fontSize: 11),
+                ),
+              ],
+            ),
+          ],
+          if (_installing) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _status,
+                  style: const TextStyle(color: kTextSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+          if (_updateInfo != null && !_downloading && !_installing) ...[
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () async {
-                  final url = _updateInfo!.downloadUrl ?? _updateInfo!.releaseUrl;
-                  if (url != null) await launchUrl(Uri.parse(url));
-                },
-                icon: const Icon(Icons.download, size: 16),
-                label: const Text('Download update'),
+                onPressed: _downloadAndInstall,
+                icon: const Icon(Icons.system_update, size: 16),
+                label: const Text('Update & restart'),
                 style: FilledButton.styleFrom(
                   backgroundColor: kAccentBlue,
                   padding: const EdgeInsets.symmetric(vertical: 10),
@@ -187,7 +292,9 @@ class _WhiskAboutDialogState extends State<WhiskAboutDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: (_downloading || _installing)
+              ? null
+              : () => Navigator.of(context).pop(),
           child: const Text('Close', style: TextStyle(color: kTextMuted)),
         ),
       ],
