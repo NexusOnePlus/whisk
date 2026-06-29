@@ -201,6 +201,32 @@ class WorkspaceViewModel extends ChangeNotifier {
       return;
     }
 
+    final cached = _renderResultCache[_activeFile.path];
+    if (cached != null && cached.state == RenderState.success && cached.pdfPath != null) {
+      final pdfFile = File(cached.pdfPath!);
+      final sourceFile = File(_activeFile.path);
+      final pdfExists = await pdfFile.exists();
+      final sourceExists = await sourceFile.exists();
+      if (pdfExists && sourceExists) {
+        final pdfMod = await pdfFile.lastModified();
+        final srcMod = await sourceFile.lastModified();
+        if (!pdfMod.isBefore(srcMod)) {
+          _renderResult = cached;
+          notifyListeners();
+          return;
+        }
+      }
+    }
+
+    final existingPdf = await _findExistingPdf(_activeFile.path, envId);
+    if (existingPdf != null) {
+      final result = RenderResult.success(pdfPath: existingPdf, engine: envId, log: '');
+      _renderResult = result;
+      _renderResultCache[_activeFile.path] = result;
+      notifyListeners();
+      return;
+    }
+
     LogBuffer.writeln(LogCategory.render,
         '[${DateTime.now().toString().substring(11, 19)}] Rendering ${_activeFile.name} ($envId)...');
 
@@ -657,6 +683,22 @@ class WorkspaceViewModel extends ChangeNotifier {
         '${_pad(now.hour)}.${_pad(now.minute)}.${_pad(now.second)}';
     return '${_documentsPath()}${Platform.pathSeparator}Whisk Docs'
         '${Platform.pathSeparator}${env.name} $timestamp';
+  }
+
+  Future<String?> _findExistingPdf(String sourcePath, String envId) async {
+    final projectRoot = _activeFile.projectRoot;
+    if (projectRoot == null) return null;
+
+    final pdfName = sourcePath.split(Platform.pathSeparator).last.replaceAll(
+      RegExp(r'\.(typ|tex)$', caseSensitive: false),
+      '.pdf',
+    );
+    final pdfPath = '$projectRoot${Platform.pathSeparator}.whisk'
+        '${Platform.pathSeparator}build${Platform.pathSeparator}$envId'
+        '${Platform.pathSeparator}$pdfName';
+    final pdfFile = File(pdfPath);
+    if (await pdfFile.exists()) return pdfPath;
+    return null;
   }
 
   static String _documentsPath() {
