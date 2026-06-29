@@ -192,7 +192,6 @@ class WorkspaceViewModel extends ChangeNotifier {
 
   Future<void> renderActiveFile() async {
     if (_disposed) return;
-    if (_renderResult.isRendering) return;
 
     final envId = selectedEnvironment.id;
     if (envId == 'notes' || envId == 'mermaid') {
@@ -211,15 +210,15 @@ class WorkspaceViewModel extends ChangeNotifier {
           return;
         }
       }
-    }
 
-    final existingPdf = await _findExistingPdf(_activeFile.path, envId);
-    if (existingPdf != null && !_activeFile.isDirty) {
-      final result = RenderResult.success(pdfPath: existingPdf, engine: envId, log: '');
-      _renderResult = result;
-      _renderResultCache[_activeFile.path] = result;
-      notifyListeners();
-      return;
+      final existingPdf = await _findExistingPdf(_activeFile.path, envId);
+      if (existingPdf != null) {
+        final result = RenderResult.success(pdfPath: existingPdf, engine: envId, log: '');
+        _renderResult = result;
+        _renderResultCache[_activeFile.path] = result;
+        notifyListeners();
+        return;
+      }
     }
 
     LogBuffer.writeln(LogCategory.render,
@@ -237,8 +236,8 @@ class WorkspaceViewModel extends ChangeNotifier {
       environmentId: selectedEnvironment.id,
       file: renderFile,
     );
-    if (_disposed || _activeFile.path != activeFile.path) return;
-    if (selectedEnvironment.id != environmentId) return;
+    if (_disposed) return;
+    if (_activeFile.path != activeFile.path || selectedEnvironment.id != environmentId) return;
 
     _renderResult = result;
     _renderResultCache[_activeFile.path] = result;
