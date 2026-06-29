@@ -1,4 +1,11 @@
 class WhiskFile {
+  static const empty = WhiskFile(
+    path: '',
+    name: '',
+    extension: '',
+    content: '',
+  );
+
   const WhiskFile({
     required this.path,
     required this.name,

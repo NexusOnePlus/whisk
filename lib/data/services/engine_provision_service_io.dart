@@ -11,7 +11,7 @@ class EngineProvisionService {
   static const _tectonicReleaseApi =
       'https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest';
   static const _typstReleaseApi =
-      'https://api.github.com/repos/typst/typst/releases/latest';
+      'https://api.github.com/repos/Myriad-Dreamin/tinymist/releases/latest';
 
   Future<EngineResolution> ensureTectonic() async {
     final bundled = await _bundledTectonicPath();
@@ -127,63 +127,67 @@ class EngineProvisionService {
   }
 
   Future<EngineResolution> ensureTypst() async {
-    final bundled = await _bundledTypstPath();
+    final bundled = await _bundledTinymistPath();
     if (await File(bundled).exists()) {
       return EngineResolution.available(executablePath: bundled);
     }
 
-    final pathEngine = await _resolveFromPath('typst');
+    final pathEngine = await _resolveFromPath('tinymist');
     if (pathEngine != null) {
       return EngineResolution.available(executablePath: pathEngine);
     }
 
-    return _downloadTypst(toPath: bundled);
+    return _downloadTinymist(toPath: bundled);
   }
 
-  Future<String> _bundledTypstPath() async {
+  Future<String> _bundledTinymistPath() async {
     final support = await getApplicationSupportDirectory();
     return [
       support.path,
       'engines',
-      'typst',
-      Platform.isWindows ? 'typst.exe' : 'typst',
+      'tinymist',
+      Platform.isWindows ? 'tinymist.exe' : 'tinymist',
     ].join(Platform.pathSeparator);
   }
 
-  Future<EngineResolution> _downloadTypst({required String toPath}) async {
+  Future<EngineResolution> _downloadTinymist({required String toPath}) async {
     if (!Platform.isWindows) {
       return const EngineResolution.unavailable(
-        'Auto-download is currently wired for Windows only. Install typst in PATH on this platform.',
+        'Auto-download is currently wired for Windows only. Install tinymist in PATH on this platform.',
       );
     }
 
-    final log = StringBuffer('Typst was not found locally.\n');
-    try {
-      final release = await http.get(
-        Uri.parse(_typstReleaseApi),
-        headers: const {
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'Whisk document renderer',
-        },
-      );
-      if (release.statusCode < 200 || release.statusCode >= 300) {
-        return EngineResolution.unavailable(
-          '${log}Could not query Typst releases: HTTP ${release.statusCode}.',
+      final log = StringBuffer('Tinymist (Typst) was not found locally.\n');
+      try {
+        final release = await http.get(
+          Uri.parse(_typstReleaseApi),
+          headers: const {
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'Whisk document renderer',
+          },
         );
-      }
+        if (release.statusCode < 200 || release.statusCode >= 300) {
+          return EngineResolution.unavailable(
+            '${log}Could not query Tinymist releases: HTTP ${release.statusCode}.',
+          );
+        }
 
-      final json = jsonDecode(release.body) as Map<String, dynamic>;
-      final assets = (json['assets'] as List<dynamic>)
-          .cast<Map<String, dynamic>>();
-      final asset = assets.where((item) {
-        final name = item['name']?.toString().toLowerCase() ?? '';
-        return name.endsWith('.zip') && name.contains('x86_64-pc-windows-msvc');
-      }).firstOrNull;
+        final json = jsonDecode(release.body) as Map<String, dynamic>;
+        final assets = (json['assets'] as List<dynamic>)
+            .cast<Map<String, dynamic>>();
+        final asset = assets.where((item) {
+          final name = item['name']?.toString().toLowerCase() ?? '';
+          return name.startsWith('tinymist-') &&
+              name.endsWith('.zip') &&
+              name.contains('x86_64-pc-windows-msvc') &&
+              !name.contains('viewer') &&
+              !name.contains('docs-tool');
+        }).firstOrNull;
 
       final downloadUrl = asset?['browser_download_url']?.toString();
       if (downloadUrl == null || downloadUrl.isEmpty) {
         return EngineResolution.unavailable(
-          '${log}Could not find a Windows x86_64 Typst ZIP in the latest release.',
+          '${log}Could not find a Windows x86_64 Tinymist ZIP in the latest release.',
         );
       }
 
@@ -201,11 +205,13 @@ class EngineProvisionService {
 
       final archive = ZipDecoder().decodeBytes(archiveResponse.bodyBytes);
       final executable = archive.files
-          .where((file) => file.isFile && file.name.endsWith('typst.exe'))
+          .where((file) =>
+              file.isFile &&
+              file.name.replaceAll('\\', '/').endsWith('tinymist.exe'))
           .firstOrNull;
       if (executable == null) {
         return EngineResolution.unavailable(
-          '${log}Downloaded archive did not contain typst.exe.',
+          '${log}Downloaded archive did not contain tinymist.exe.',
         );
       }
 
@@ -215,7 +221,7 @@ class EngineProvisionService {
 
       return EngineResolution.available(
         executablePath: output.path,
-        log: '${log}Installed Typst at ${output.path}.',
+        log: '${log}Installed Tinymist at ${output.path}.',
         wasProvisioned: true,
       );
     } on Object catch (error) {

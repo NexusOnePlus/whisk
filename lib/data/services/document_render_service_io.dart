@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:path_provider/path_provider.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:whisk/data/services/engine_provision_service.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
@@ -97,6 +99,7 @@ class DocumentRenderService {
       );
       final pdf = File('${build.path}${Platform.pathSeparator}$pdfName');
       if (await pdf.exists()) {
+        await _generateThumbnail(pdf.path, build.path);
         return RenderResult.success(
           pdfPath: pdf.path,
           engine: attempt.engine,
@@ -128,6 +131,11 @@ class DocumentRenderService {
       ..writeln();
 
     if (typst.available && typst.executablePath != null) {
+      final pdfName = Uri.file(workspace.sourcePath).pathSegments.last.replaceAll(
+        RegExp(r'\.typ$', caseSensitive: false),
+        '.pdf',
+      );
+      final pdfPath = '${build.path}${Platform.pathSeparator}$pdfName';
       final result = await _tryRun(
         _RenderAttempt(
           engine: 'typst',
@@ -135,7 +143,7 @@ class DocumentRenderService {
           arguments: [
             'compile',
             workspace.entrypoint,
-            '${build.path}${Platform.pathSeparator}output.pdf',
+            pdfPath,
             '--root',
             root.path,
           ],
@@ -149,8 +157,9 @@ class DocumentRenderService {
         ..writeln();
 
       if (result.success) {
-        final pdf = File('${build.path}${Platform.pathSeparator}output.pdf');
+        final pdf = File(pdfPath);
         if (await pdf.exists()) {
+          await _generateThumbnail(pdf.path, build.path);
           return RenderResult.success(
             pdfPath: pdf.path,
             engine: 'typst',
@@ -163,6 +172,30 @@ class DocumentRenderService {
     return RenderResult.failed(
       'Could not render Typst.\n\n${logs.toString()}',
     );
+  }
+
+  Future<void> _generateThumbnail(String pdfPath, String buildDir) async {
+    try {
+      final doc = await PdfDocument.openFile(pdfPath);
+      final page = doc.pages[0];
+      const thumbW = 300.0;
+      final thumbH = thumbW / (page.width / page.height);
+      final image = await page.render(
+        fullWidth: thumbW,
+        fullHeight: thumbH,
+      );
+      if (image == null) return;
+      final uiImage = await image.createImage();
+      final byteData = await uiImage.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      if (byteData == null) return;
+      await File('$buildDir${Platform.pathSeparator}thumb.png')
+          .writeAsBytes(byteData.buffer.asUint8List());
+      image.dispose();
+      await doc.dispose();
+    } catch (_) {
+    }
   }
 
   Future<_ProcessResult> _tryRun(
@@ -189,12 +222,6 @@ class DocumentRenderService {
   }
 
   Future<_RenderWorkspace> _prepareWorkspace(WhiskFile file, {String engine = 'latex'}) async {
-    final support = await getApplicationSupportDirectory();
-    final cacheRoot = Directory(
-      '${support.path}${Platform.pathSeparator}cache',
-    );
-    await cacheRoot.create(recursive: true);
-
     final projectRoot = file.projectRoot == null
         ? await Directory.systemTemp.createTemp('whisk-draft-$engine-')
         : Directory(file.projectRoot!);
@@ -202,6 +229,13 @@ class DocumentRenderService {
     final whiskRoot = Directory(
       '${projectRoot.path}${Platform.pathSeparator}.whisk',
     );
+    final cacheRoot = Directory(
+      file.projectRoot != null
+          ? '${whiskRoot.path}${Platform.pathSeparator}cache'
+          : '${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}cache',
+    );
+    await cacheRoot.create(recursive: true);
+
     final buildRoot = Directory(
       '${whiskRoot.path}${Platform.pathSeparator}build${Platform.pathSeparator}$engine',
     );
@@ -221,6 +255,7 @@ class DocumentRenderService {
 
     final env = <String, String>{
       'WHISK_CACHE_DIR': cacheRoot.path,
+      'TYPST_PACKAGE_CACHE': '${cacheRoot.path}${Platform.pathSeparator}typst',
     };
     if (engine == 'latex') {
       env.addAll({
