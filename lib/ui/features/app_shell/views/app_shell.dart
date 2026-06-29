@@ -3,6 +3,7 @@ import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/app_shell/view_models/app_shell_view_model.dart';
 import 'package:whisk/ui/features/app_shell/widgets/about_dialog.dart' as whisk;
 import 'package:whisk/ui/features/dashboard/views/dashboard_screen.dart';
+import 'package:whisk/ui/features/projects/views/projects_screen.dart';
 import 'package:whisk/ui/features/workspace/views/workspace_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -60,6 +61,19 @@ class _AppShellState extends State<AppShell> {
             onCloseProject: viewModel.closeAndRemoveWorkspace,
             onTogglePin: viewModel.togglePinProject,
             onSwitchProject: viewModel.switchToProject,
+            onProjects: viewModel.showProjects,
+            onAbout: () => showDialog(
+              context: context,
+              builder: (_) => const whisk.WhiskAboutDialog(),
+            ),
+          ),
+          AppShellMode.projects => ProjectsScreen(
+            openProjects: viewModel.openProjectPaths,
+            pinnedProjects: viewModel.pinnedProjects,
+            activeProjectTitle: viewModel.activeWorkspaceTitle,
+            onSwitchProject: viewModel.switchToProject,
+            onTogglePin: viewModel.togglePinProject,
+            onBackToWorkspace: viewModel.resumeFromProjects,
             onAbout: () => showDialog(
               context: context,
               builder: (_) => const whisk.WhiskAboutDialog(),

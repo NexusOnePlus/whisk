@@ -14,7 +14,7 @@ import 'package:whisk/domain/models/recent_project.dart';
 import 'package:whisk/domain/models/whisk_file.dart';
 import 'package:whisk/ui/features/workspace/view_models/workspace_view_model.dart';
 
-enum AppShellMode { dashboard, workspace, localCollaboration }
+enum AppShellMode { dashboard, workspace, localCollaboration, projects }
 
 class AppShellViewModel extends ChangeNotifier {
   AppShellViewModel({this._projectOpenService = const ProjectOpenService()}) {
@@ -277,6 +277,25 @@ class AppShellViewModel extends ChangeNotifier {
     _mode = AppShellMode.dashboard;
     notifyListeners();
   }
+
+  void showProjects() {
+    if (_disposed) return;
+    _previousMode = _mode;
+    _mode = AppShellMode.projects;
+    notifyListeners();
+  }
+
+  void resumeFromProjects() {
+    if (_disposed) return;
+    if (_previousMode == AppShellMode.workspace && _workspaceViewModel != null) {
+      _mode = AppShellMode.workspace;
+    } else {
+      _mode = AppShellMode.dashboard;
+    }
+    notifyListeners();
+  }
+
+  AppShellMode? _previousMode;
 
   void resumeActiveWorkspace() {
     if (_disposed) return;

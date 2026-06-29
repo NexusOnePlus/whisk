@@ -18,7 +18,6 @@ import 'package:whisk/ui/features/workspace/widgets/editor_content_frame.dart';
 import 'package:whisk/ui/features/workspace/widgets/editor_navbar.dart';
 import 'package:whisk/ui/features/workspace/widgets/join_invite_dialog.dart';
 import 'package:whisk/ui/features/workspace/widgets/log_viewer_dialog.dart';
-import 'package:whisk/ui/features/workspace/widgets/projects_panel.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -32,6 +31,7 @@ class WorkspaceScreen extends StatefulWidget {
     this.onTogglePin,
     this.onSwitchProject,
     this.onAbout,
+    this.onProjects,
   });
 
   final WorkspaceViewModel viewModel;
@@ -42,6 +42,7 @@ class WorkspaceScreen extends StatefulWidget {
   final ValueChanged<String>? onTogglePin;
   final ValueChanged<String>? onSwitchProject;
   final VoidCallback? onAbout;
+  final VoidCallback? onProjects;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -262,18 +263,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     );
   }
 
-  void _showProjects() {
-    showDialog(
-      context: context,
-      builder: (context) => ProjectsPanel(
-        openProjects: widget.openProjects,
-        pinnedProjects: widget.pinnedProjects,
-        onSwitchProject: widget.onSwitchProject,
-        onTogglePin: widget.onTogglePin,
-      ),
-    );
-  }
-
   bool get _canExportPdf {
     final envId = viewModel.selectedEnvironment.id;
     return envId == 'latex' || envId == 'typst';
@@ -442,7 +431,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                           onSwitchProject: widget.onSwitchProject,
                           onShowLogs: _showLogs,
                           onHome: widget.onCloseWorkspace,
-                          onProjects: _showProjects,
+                          onProjects: widget.onProjects,
                         ),
                         Expanded(
                           child: Padding(
