@@ -85,6 +85,7 @@ class _AppShellState extends State<AppShell> {
           activeProjectTitle: viewModel.activeWorkspaceTitle,
           onSwitchProject: viewModel.switchToProject,
           onTogglePin: viewModel.togglePinProject,
+          onRemoveProject: viewModel.removeRecentProject,
         );
       case RailTab.home:
         return DashboardContent(

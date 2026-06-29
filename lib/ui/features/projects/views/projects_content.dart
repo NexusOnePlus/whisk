@@ -16,6 +16,7 @@ class ProjectsContent extends StatefulWidget {
     this.activeProjectTitle,
     this.onSwitchProject,
     this.onTogglePin,
+    this.onRemoveProject,
   });
 
   final List<String> openProjects;
@@ -24,6 +25,7 @@ class ProjectsContent extends StatefulWidget {
   final String? activeProjectTitle;
   final ValueChanged<String>? onSwitchProject;
   final ValueChanged<String>? onTogglePin;
+  final ValueChanged<String>? onRemoveProject;
 
   @override
   State<ProjectsContent> createState() => _ProjectsContentState();
@@ -360,6 +362,7 @@ class _ProjectsContentState extends State<ProjectsContent> {
                   tagsService: _tagsService,
                   onSwitchProject: widget.onSwitchProject,
                   onTogglePin: widget.onTogglePin,
+                  onRemoveProject: widget.onRemoveProject,
                   onMoveToCollection: _showMoveToCollectionDialog,
                 ),
                 // Collection sections
@@ -374,6 +377,7 @@ class _ProjectsContentState extends State<ProjectsContent> {
                     tagsService: _tagsService,
                     onSwitchProject: widget.onSwitchProject,
                     onTogglePin: widget.onTogglePin,
+                    onRemoveProject: widget.onRemoveProject,
                     onMoveToCollection: _showMoveToCollectionDialog,
                     onDeleteCollection: () {
                       _collectionService.removeCollection(collection.name);
@@ -403,6 +407,7 @@ class _CollectionSection extends StatelessWidget {
     required this.tagsService,
     this.onSwitchProject,
     this.onTogglePin,
+    this.onRemoveProject,
     this.onMoveToCollection,
     this.onDeleteCollection,
     this.onRenameCollection,
@@ -416,6 +421,7 @@ class _CollectionSection extends StatelessWidget {
   final ProjectTagsService tagsService;
   final ValueChanged<String>? onSwitchProject;
   final ValueChanged<String>? onTogglePin;
+  final ValueChanged<String>? onRemoveProject;
   final ValueChanged<String>? onMoveToCollection;
   final VoidCallback? onDeleteCollection;
   final ValueChanged<String>? onRenameCollection;
@@ -517,6 +523,9 @@ class _CollectionSection extends StatelessWidget {
                       : null,
                   onTogglePin: onTogglePin != null
                       ? () => onTogglePin!(path)
+                      : null,
+                  onRemove: onRemoveProject != null
+                      ? () => onRemoveProject!(path)
                       : null,
                   onAddTag: (tag) => tagsService.addTag(path, tag),
                   onRemoveTag: (tag) => tagsService.removeTag(path, tag),
@@ -680,6 +689,7 @@ class _ProjectThumbnailCard extends StatefulWidget {
     required this.tags,
     this.onTap,
     this.onTogglePin,
+    this.onRemove,
     this.onAddTag,
     this.onRemoveTag,
     this.onMoveToCollection,
@@ -690,6 +700,7 @@ class _ProjectThumbnailCard extends StatefulWidget {
   final List<String> tags;
   final VoidCallback? onTap;
   final VoidCallback? onTogglePin;
+  final VoidCallback? onRemove;
   final ValueChanged<String>? onAddTag;
   final ValueChanged<String>? onRemoveTag;
   final VoidCallback? onMoveToCollection;
@@ -867,6 +878,8 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
         PopupMenuItem(value: 'tag', height: 36, child: Row(children: [const Icon(Icons.label_outline, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Add tag', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
         if (widget.onMoveToCollection != null)
           PopupMenuItem(value: 'move', height: 36, child: Row(children: [const Icon(Icons.drive_file_move_outlined, size: 16, color: kTextSecondary), const SizedBox(width: 8), const Text('Move to collection', style: TextStyle(color: kTextPrimary, fontSize: 13))])),
+        if (widget.onRemove != null)
+          PopupMenuItem(value: 'remove', height: 36, child: Row(children: [const Icon(Icons.delete_outline, size: 16, color: kDangerRed), const SizedBox(width: 8), const Text('Remove', style: TextStyle(color: kDangerRed, fontSize: 13))])),
       ],
     ).then((value) {
       if (!context.mounted) return;
@@ -874,6 +887,7 @@ class _ProjectThumbnailCardState extends State<_ProjectThumbnailCard> {
       if (value == 'pin') widget.onTogglePin?.call();
       if (value == 'tag') _showAddTagDialog(context);
       if (value == 'move') widget.onMoveToCollection?.call();
+      if (value == 'remove') widget.onRemove?.call();
     });
   }
 
