@@ -117,18 +117,53 @@ class DocumentRenderService {
 
       if (!result.success) continue;
 
-      final pdfName = source.uri.pathSegments.last.replaceAll(
+      final baseName = source.uri.pathSegments.last.replaceAll(
         RegExp(r'\.tex$', caseSensitive: false),
-        '.pdf',
+        '',
       );
-      final pdf = File('${build.path}${Platform.pathSeparator}$pdfName');
-      if (await pdf.exists()) {
-        await _generateThumbnail(pdf.path, build.path);
-        return RenderResult.success(
-          pdfPath: pdf.path,
-          engine: attempt.engine,
-          log: logs.toString(),
+      // LaTeX always outputs to baseName.pdf by default based on the entrypoint
+      final defaultPdf = File(
+        '${build.path}${Platform.pathSeparator}$baseName.pdf',
+      );
+
+      if (await defaultPdf.exists()) {
+        final uniqueId = DateTime.now().millisecondsSinceEpoch;
+        final finalPdf = File(
+          '${build.path}${Platform.pathSeparator}${baseName}_$uniqueId.pdf',
         );
+
+        // Cleanup old pdfs
+        try {
+          final dir = Directory(build.path);
+          if (dir.existsSync()) {
+            for (final entity in dir.listSync()) {
+              if (entity is File &&
+                  entity.path.endsWith('.pdf') &&
+                  entity.path != defaultPdf.path) {
+                try {
+                  entity.deleteSync();
+                } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
+
+        try {
+          await defaultPdf.rename(finalPdf.path);
+          await _generateThumbnail(finalPdf.path, build.path);
+          return RenderResult.success(
+            pdfPath: finalPdf.path,
+            engine: attempt.engine,
+            log: logs.toString(),
+          );
+        } catch (_) {
+          await _generateThumbnail(defaultPdf.path, build.path);
+          return RenderResult.success(
+            pdfPath: defaultPdf.path,
+            engine: attempt.engine,
+            log: logs.toString(),
+          );
+        }
       }
     }
 
@@ -162,11 +197,26 @@ class DocumentRenderService {
       ..writeln();
 
     if (typst.available && typst.executablePath != null) {
-      final pdfName = Uri.file(workspace.sourcePath).pathSegments.last.replaceAll(
-        RegExp(r'\.typ$', caseSensitive: false),
-        '.pdf',
-      );
+      final baseName = Uri.file(workspace.sourcePath).pathSegments.last
+          .replaceAll(RegExp(r'\.typ$', caseSensitive: false), '');
+      final uniqueId = DateTime.now().millisecondsSinceEpoch;
+      final pdfName = '${baseName}_$uniqueId.pdf';
       final pdfPath = '${build.path}${Platform.pathSeparator}$pdfName';
+
+      // Cleanup old pdfs
+      try {
+        final dir = Directory(build.path);
+        if (dir.existsSync()) {
+          for (final entity in dir.listSync()) {
+            if (entity is File && entity.path.endsWith('.pdf')) {
+              try {
+                entity.deleteSync();
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
+
       final result = await _tryRun(
         _RenderAttempt(
           engine: 'typst',
@@ -200,9 +250,7 @@ class DocumentRenderService {
       }
     }
 
-    return RenderResult.failed(
-      'Could not render Typst.\n\n${logs.toString()}',
-    );
+    return RenderResult.failed('Could not render Typst.\n\n${logs.toString()}');
   }
 
   Future<void> _generateThumbnail(String pdfPath, String buildDir) async {
@@ -211,22 +259,17 @@ class DocumentRenderService {
       final page = doc.pages[0];
       const thumbW = 300.0;
       final thumbH = thumbW / (page.width / page.height);
-      final image = await page.render(
-        fullWidth: thumbW,
-        fullHeight: thumbH,
-      );
+      final image = await page.render(fullWidth: thumbW, fullHeight: thumbH);
       if (image == null) return;
       final uiImage = await image.createImage();
-      final byteData = await uiImage.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
+      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
-      await File('$buildDir${Platform.pathSeparator}thumb.png')
-          .writeAsBytes(byteData.buffer.asUint8List());
+      await File(
+        '$buildDir${Platform.pathSeparator}thumb.png',
+      ).writeAsBytes(byteData.buffer.asUint8List());
       image.dispose();
       await doc.dispose();
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   Future<_ProcessResult> _tryRun(
@@ -252,7 +295,10 @@ class DocumentRenderService {
     }
   }
 
-  Future<_RenderWorkspace> _prepareWorkspace(WhiskFile file, {String engine = 'latex'}) async {
+  Future<_RenderWorkspace> _prepareWorkspace(
+    WhiskFile file, {
+    String engine = 'latex',
+  }) async {
     final projectRoot = file.projectRoot == null
         ? await Directory.systemTemp.createTemp('whisk-draft-$engine-')
         : Directory(file.projectRoot!);
@@ -296,7 +342,9 @@ class DocumentRenderService {
       'TMP': cacheRoot.path,
     };
 
-    final fontconfigFile = File('${cacheRoot.path}${Platform.pathSeparator}fontconfig.conf');
+    final fontconfigFile = File(
+      '${cacheRoot.path}${Platform.pathSeparator}fontconfig.conf',
+    );
     if (!await fontconfigFile.exists()) {
       await fontconfigFile.writeAsString(
         '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts:dtd:config:1.0">\n<fontconfig/>\n',

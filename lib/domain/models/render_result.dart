@@ -13,6 +13,9 @@ class RenderResult {
 
   const RenderResult.rendering() : this(state: RenderState.rendering);
 
+  const RenderResult.renderingWithLog(String log)
+    : this(state: RenderState.rendering, log: log);
+
   factory RenderResult.success({
     String? pdfPath,
     String? engine,

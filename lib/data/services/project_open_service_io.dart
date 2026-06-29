@@ -82,18 +82,28 @@ class ProjectOpenService {
     for (final file in files) {
       final ext = extensionOf(file.path);
       final isText = const {
-        '.tex', '.bib', '.sty', '.cls', '.typ', '.md', '.mmd',
+        '.tex',
+        '.bib',
+        '.sty',
+        '.cls',
+        '.typ',
+        '.md',
+        '.mmd',
       }.contains(ext);
       final fileContent = file.path == entry?.path
           ? content
-          : isText ? await file.readAsString() : '';
-      allFiles.add(WhiskFile(
-        path: file.path,
-        name: file.uri.pathSegments.last,
-        extension: ext,
-        content: fileContent,
-        projectRoot: root.path,
-      ));
+          : isText
+          ? await file.readAsString()
+          : '';
+      allFiles.add(
+        WhiskFile(
+          path: file.path,
+          name: file.uri.pathSegments.last,
+          extension: ext,
+          content: fileContent,
+          projectRoot: root.path,
+        ),
+      );
     }
 
     return WhiskProject(
@@ -125,7 +135,6 @@ class ProjectOpenService {
     final entries = <FileSystemEntity>[];
     await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is! Directory) continue;
-      final name = entity.path.split(Platform.pathSeparator).last;
       if (_isIgnoredPath(path, entity.path)) continue;
       entries.add(entity);
     }

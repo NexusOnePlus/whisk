@@ -31,13 +31,20 @@ class WorkspaceViewModel extends ChangeNotifier {
     List<WhiskFile>? projectFiles,
     int startEnvIndex = 0,
   }) : _environments = catalog.listEnvironments() {
-    _selectedEnvironmentIndex = startEnvIndex.clamp(0, _environments.length - 1);
+    _selectedEnvironmentIndex = startEnvIndex.clamp(
+      0,
+      _environments.length - 1,
+    );
     if (initialFile != null) {
       _activeFile = initialFile;
       _projectFiles = projectFiles ?? [initialFile];
     } else {
-      _draftRootPath = computeDraftRootPath(_environments[_selectedEnvironmentIndex]);
-      _activeFile = _fileForEnvironment(_environments[_selectedEnvironmentIndex]);
+      _draftRootPath = computeDraftRootPath(
+        _environments[_selectedEnvironmentIndex],
+      );
+      _activeFile = _fileForEnvironment(
+        _environments[_selectedEnvironmentIndex],
+      );
       _projectFiles = [_activeFile];
     }
     _openFiles = [_activeFile];
@@ -97,6 +104,7 @@ class WorkspaceViewModel extends ChangeNotifier {
     final id = selectedEnvironment.id;
     return id == 'notes' || id == 'mermaid';
   }
+
   List<CollaborationPeer> get collaborationPeers =>
       List.unmodifiable(_collaborationPeers);
   Stream<CollaborationTextUpdate>? get remoteTextUpdates =>
@@ -116,8 +124,8 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (_isInlineEnv) {
       _renderResult = RenderResult.success(content: _activeFile.content);
     } else {
-      _renderResult = _renderResultCache[_activeFile.path] ??
-          const RenderResult.idle();
+      _renderResult =
+          _renderResultCache[_activeFile.path] ?? const RenderResult.idle();
     }
     notifyListeners();
   }
@@ -150,8 +158,10 @@ class WorkspaceViewModel extends ChangeNotifier {
     await saveActiveFile();
     if (_disposed) return;
 
-    LogBuffer.writeln(LogCategory.system,
-        '[${DateTime.now().toString().substring(11, 19)}] Open file: ${file.name}');
+    LogBuffer.writeln(
+      LogCategory.system,
+      '[${DateTime.now().toString().substring(11, 19)}] Open file: ${file.name}',
+    );
 
     _renderResultCache[_activeFile.path] = _renderResult;
 
@@ -183,48 +193,100 @@ class WorkspaceViewModel extends ChangeNotifier {
     if (_isInlineEnv) {
       _renderResult = RenderResult.success(content: next.content);
     } else {
-      _renderResult = _renderResultCache[next.path] ??
-          const RenderResult.idle();
+      _renderResult =
+          _renderResultCache[next.path] ?? const RenderResult.idle();
     }
     _syncActiveFileSnapshot();
     notifyListeners();
   }
 
+  /// Check for existing PDF on disk and load into cache (for recents/open case).
+  /// This avoids unnecessary re-renders when opening a project that already has a compiled PDF.
+  Future<void> preloadExistingPdf() async {
+    final envId = selectedEnvironment.id;
+    if (envId == 'notes' || envId == 'mermaid') return;
+
+    final existingPdf = await _findExistingPdf(_activeFile.path, envId);
+    if (existingPdf != null) {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] Preloaded existing PDF from disk',
+      );
+
+      final result = RenderResult.success(
+        pdfPath: existingPdf,
+        engine: envId,
+        log: '',
+      );
+      _renderResult = result;
+      _renderResultCache[_activeFile.path] = result;
+      notifyListeners();
+    }
+  }
+
   Future<void> renderActiveFile() async {
     if (_disposed) return;
 
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] renderActiveFile called (isDirty: ${_activeFile.isDirty})',
+    );
+
     final envId = selectedEnvironment.id;
     if (envId == 'notes' || envId == 'mermaid') {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] Inline env (${selectedEnvironment.name}), using content directly',
+      );
       _renderResult = RenderResult.success(content: _activeFile.content);
       notifyListeners();
       return;
     }
 
+    // Check cache only if file is not dirty
     if (!_activeFile.isDirty) {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] Checking cache (not dirty)',
+      );
       final cached = _renderResultCache[_activeFile.path];
-      if (cached != null && cached.state == RenderState.success && cached.pdfPath != null) {
+      if (cached != null &&
+          cached.state == RenderState.success &&
+          cached.pdfPath != null) {
         final pdfFile = File(cached.pdfPath!);
         if (await pdfFile.exists()) {
+          LogBuffer.writeln(
+            LogCategory.render,
+            '[${DateTime.now().toString().substring(11, 19)}] Cache hit, returning cached PDF',
+          );
           _renderResult = cached;
           notifyListeners();
           return;
         }
       }
-
-      final existingPdf = await _findExistingPdf(_activeFile.path, envId);
-      if (existingPdf != null) {
-        final result = RenderResult.success(pdfPath: existingPdf, engine: envId, log: '');
-        _renderResult = result;
-        _renderResultCache[_activeFile.path] = result;
-        notifyListeners();
-        return;
-      }
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] No cache hit, proceeding to render',
+      );
+    } else {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] File is dirty, proceeding to render',
+      );
     }
 
-    LogBuffer.writeln(LogCategory.render,
-        '[${DateTime.now().toString().substring(11, 19)}] Rendering ${_activeFile.name} ($envId)...');
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] Starting render for ${_activeFile.name} ($envId)',
+    );
 
-    _renderResult = const RenderResult.rendering();
+    // Preserve previous log during rendering
+    final previousLog = _renderResult.log;
+
+    _renderResult = RenderResult(
+      state: RenderState.rendering,
+      log: previousLog,
+    );
     notifyListeners();
 
     final activeFile = _activeFile;
@@ -237,19 +299,43 @@ class WorkspaceViewModel extends ChangeNotifier {
       file: renderFile,
     );
     if (_disposed) return;
-    if (_activeFile.path != activeFile.path || selectedEnvironment.id != environmentId) return;
+    if (_activeFile.path != activeFile.path ||
+        selectedEnvironment.id != environmentId) {
+      return;
+    }
 
-    _renderResult = result;
-    _renderResultCache[_activeFile.path] = result;
+    var combinedLog = previousLog.isNotEmpty
+        ? '${previousLog.trim()}\n\n--- [${DateTime.now().toString().substring(11, 19)}] Render ---\n\n${result.log.trim()}'
+        : result.log.trim();
+
+    if (combinedLog.length > 30000) {
+      combinedLog = combinedLog.substring(combinedLog.length - 30000);
+    }
+
+    String? finalPdfPath = result.pdfPath;
+
+    final finalResult = result.state == RenderState.success
+        ? RenderResult.success(
+            pdfPath: finalPdfPath,
+            engine: result.engine,
+            log: combinedLog,
+            content: result.content,
+          )
+        : RenderResult.failed(combinedLog);
+
+    _renderResult = finalResult;
+    _renderResultCache[_activeFile.path] = finalResult;
     notifyListeners();
 
-    final status = result.state == RenderState.success
+    final status = finalResult.state == RenderState.success
         ? 'OK'
         : result.state == RenderState.failed
-            ? 'FAILED'
-            : '?';
-    LogBuffer.writeln(LogCategory.render,
-        '[${DateTime.now().toString().substring(11, 19)}] Render result: $status (${result.engine ?? envId})');
+        ? 'FAILED'
+        : '?';
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] Render result: $status (${result.engine ?? envId})',
+    );
 
     if (result.log.isNotEmpty) {
       final lines = result.log.trim().split('\n');
@@ -264,41 +350,53 @@ class WorkspaceViewModel extends ChangeNotifier {
 
   Future<void> saveActiveFile() async {
     if (_disposed) return;
-    if (!_activeFile.isDirty) return;
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] saveActiveFile called (isDirty: ${_activeFile.isDirty})',
+    );
+
+    // Always clear cache so that the next renderActiveFile call actually renders
+    _renderResultCache.remove(_activeFile.path);
+
+    if (!_activeFile.isDirty) {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] Skipping save (not dirty), but forcing render',
+      );
+      await renderActiveFile();
+      return;
+    }
     if (_activeFile.projectRoot == null) return;
     if (!_canWriteLocalFiles) {
       await _saveGuestDraftActiveFile();
       _activeFile = _activeFile.copyWith(isDirty: false);
-      _renderResultCache.remove(_activeFile.path);
       _replaceFileInLists(_activeFile);
       notifyListeners();
+      // Trigger render after save
+      await renderActiveFile();
       return;
     }
 
     final file = File(_activeFile.path);
     await file.parent.create(recursive: true);
     await file.writeAsString(_activeFile.content);
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] File written to disk',
+    );
     _activeFile = _activeFile.copyWith(isDirty: false);
-    _renderResultCache.remove(_activeFile.path);
-    await _deleteExistingPdf(_activeFile.path, selectedEnvironment.id);
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] Cache cleared, save complete',
+    );
     _replaceFileInLists(_activeFile);
     notifyListeners();
+    // Trigger render after save (cache is cleared, so it will always render)
+    await renderActiveFile();
   }
 
-  Future<void> _deleteExistingPdf(String sourcePath, String envId) async {
-    final projectRoot = _activeFile.projectRoot;
-    if (projectRoot == null) return;
-    final pdfName = sourcePath.split(Platform.pathSeparator).last.replaceAll(
-      RegExp(r'\.(typ|tex)$', caseSensitive: false), '.pdf',
-    );
-    final pdfPath = '$projectRoot${Platform.pathSeparator}.whisk'
-        '${Platform.pathSeparator}build${Platform.pathSeparator}$envId'
-        '${Platform.pathSeparator}$pdfName';
-    final pdfFile = File(pdfPath);
-    if (await pdfFile.exists()) {
-      try { await pdfFile.delete(); } catch (_) {}
-    }
-  }
+  // No longer needed: we use preview copies so file lock issues are bypassed.
+  // Future<void> _deleteExistingPdf(String sourcePath, String envId) async { ... }
 
   Future<String?> createCollaborationInvite() async {
     if (_disposed) return null;
@@ -317,6 +415,10 @@ class WorkspaceViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    LogBuffer.writeln(
+      LogCategory.system,
+      '[${DateTime.now().toString().substring(11, 19)}] Disposing WorkspaceViewModel...',
+    );
     _disposed = true;
     _watcherSubscription?.cancel();
     _peersSubscription?.cancel();
@@ -383,14 +485,16 @@ class WorkspaceViewModel extends ChangeNotifier {
       final name = entity.path.split(Platform.pathSeparator).last;
       if (_isIgnoredFolder(name)) continue;
       if (entity is Directory) {
-        folders.add(WhiskFile(
-          path: entity.path,
-          name: name,
-          extension: '',
-          content: '',
-          projectRoot: root,
-          isDirectory: true,
-        ));
+        folders.add(
+          WhiskFile(
+            path: entity.path,
+            name: name,
+            extension: '',
+            content: '',
+            projectRoot: root,
+            isDirectory: true,
+          ),
+        );
       }
     }
 
@@ -701,11 +805,12 @@ class WorkspaceViewModel extends ChangeNotifier {
     final projectRoot = _activeFile.projectRoot;
     if (projectRoot == null) return null;
 
-    final pdfName = sourcePath.split(Platform.pathSeparator).last.replaceAll(
-      RegExp(r'\.(typ|tex)$', caseSensitive: false),
-      '.pdf',
-    );
-    final pdfPath = '$projectRoot${Platform.pathSeparator}.whisk'
+    final pdfName = sourcePath
+        .split(Platform.pathSeparator)
+        .last
+        .replaceAll(RegExp(r'\.(typ|tex)$', caseSensitive: false), '.pdf');
+    final pdfPath =
+        '$projectRoot${Platform.pathSeparator}.whisk'
         '${Platform.pathSeparator}build${Platform.pathSeparator}$envId'
         '${Platform.pathSeparator}$pdfName';
     final pdfFile = File(pdfPath);

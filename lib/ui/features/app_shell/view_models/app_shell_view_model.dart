@@ -77,12 +77,14 @@ class AppShellViewModel extends ChangeNotifier {
     if (_disposed) return;
     final env = const EnvironmentCatalog().listEnvironments()[envIndex];
     final rootPath = WorkspaceViewModel.computeDraftRootPath(env);
-    _recentProjectService.save(RecentProject(
-      path: rootPath,
-      name: rootPath.split(Platform.pathSeparator).last,
-      type: env.id,
-      lastOpened: DateTime.now().millisecondsSinceEpoch,
-    ));
+    _recentProjectService.save(
+      RecentProject(
+        path: rootPath,
+        name: rootPath.split(Platform.pathSeparator).last,
+        type: env.id,
+        lastOpened: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
     for (final workspace in _collaborationViewModels) {
       workspace.dispose();
     }
@@ -159,13 +161,15 @@ class AppShellViewModel extends ChangeNotifier {
     final existing = _recentProjectService.projects
         .where((p) => p.path == path)
         .firstOrNull;
-    _recentProjectService.save(RecentProject(
-      path: path,
-      name: path.split(Platform.pathSeparator).last,
-      type: type,
-      lastOpened: DateTime.now().millisecondsSinceEpoch,
-      lastFilePath: lastFilePath ?? existing?.lastFilePath,
-    ));
+    _recentProjectService.save(
+      RecentProject(
+        path: path,
+        name: path.split(Platform.pathSeparator).last,
+        type: type,
+        lastOpened: DateTime.now().millisecondsSinceEpoch,
+        lastFilePath: lastFilePath ?? existing?.lastFilePath,
+      ),
+    );
   }
 
   Future<void> openProject() async {
@@ -174,7 +178,11 @@ class AppShellViewModel extends ChangeNotifier {
     if (project == null) return;
 
     final rootPath = project.rootPath;
-    _saveRecentForPath(rootPath, 'folder', lastFilePath: project.entryFile.path);
+    _saveRecentForPath(
+      rootPath,
+      'folder',
+      lastFilePath: project.entryFile.path,
+    );
     unawaited(WorkspaceConfig.ensureDefaults(rootPath));
 
     final envIndex = const EnvironmentCatalog().listEnvironments().indexWhere(
@@ -201,6 +209,7 @@ class AppShellViewModel extends ChangeNotifier {
     _mode = AppShellMode.workspace;
     notifyListeners();
 
+    await workspace.preloadExistingPdf();
     await workspace.renderActiveFile();
   }
 
@@ -214,7 +223,9 @@ class AppShellViewModel extends ChangeNotifier {
 
     final guestName = SettingsService.instance.profileName.isNotEmpty
         ? SettingsService.instance.profileName
-        : (payload?.hostName.isNotEmpty == true ? 'Guest of ${payload!.hostName}' : 'Guest');
+        : (payload?.hostName.isNotEmpty == true
+              ? 'Guest of ${payload!.hostName}'
+              : 'Guest');
     final service = CollaborationServiceP2p(peerName: guestName);
     await service.connect('guest-${DateTime.now().microsecondsSinceEpoch}');
     if (_disposed) {
@@ -325,7 +336,9 @@ class AppShellViewModel extends ChangeNotifier {
     if (!await root.exists()) return;
     unawaited(WorkspaceConfig.ensureDefaults(project.path));
 
-    final diskProject = await _projectOpenService.pickProjectFromPath(project.path);
+    final diskProject = await _projectOpenService.pickProjectFromPath(
+      project.path,
+    );
     if (_disposed) return;
     if (diskProject == null) return;
 
@@ -346,13 +359,15 @@ class AppShellViewModel extends ChangeNotifier {
       }
     }
 
-    _recentProjectService.save(RecentProject(
-      path: project.path,
-      name: project.name,
-      type: project.type,
-      lastOpened: DateTime.now().millisecondsSinceEpoch,
-      lastFilePath: initialFile.path,
-    ));
+    _recentProjectService.save(
+      RecentProject(
+        path: project.path,
+        name: project.name,
+        type: project.type,
+        lastOpened: DateTime.now().millisecondsSinceEpoch,
+        lastFilePath: initialFile.path,
+      ),
+    );
 
     _workspaceViewModel?.dispose();
     for (final workspace in _collaborationViewModels) {
@@ -374,6 +389,7 @@ class AppShellViewModel extends ChangeNotifier {
     _mode = AppShellMode.workspace;
     notifyListeners();
 
+    await workspace.preloadExistingPdf();
     await workspace.renderActiveFile();
   }
 
@@ -388,12 +404,14 @@ class AppShellViewModel extends ChangeNotifier {
     final existing = _recentProjectService.projects
         .where((p) => p.path == path)
         .firstOrNull;
-    final project = existing ?? RecentProject(
-      path: path,
-      name: path.split(Platform.pathSeparator).last,
-      type: 'folder',
-      lastOpened: DateTime.now().millisecondsSinceEpoch,
-    );
+    final project =
+        existing ??
+        RecentProject(
+          path: path,
+          name: path.split(Platform.pathSeparator).last,
+          type: 'folder',
+          lastOpened: DateTime.now().millisecondsSinceEpoch,
+        );
     await openRecentProject(project);
   }
 

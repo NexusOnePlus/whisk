@@ -61,6 +61,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   int? _revealOffset;
   Timer? _contentSyncTimer;
   Timer? _presenceSyncTimer;
+  Timer? _renderDebounce;
   String? _pendingContent;
   StreamSubscription? _operationSubscription;
   StreamSubscription? _remoteTextSubscription;
@@ -111,6 +112,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     _glowController.dispose();
     _contentSyncTimer?.cancel();
     _presenceSyncTimer?.cancel();
+    _renderDebounce?.cancel();
     _operationSubscription?.cancel();
     _remoteTextSubscription?.cancel();
     viewModel.removeListener(_onViewModelChanged);
@@ -126,25 +128,42 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   void _onViewModelChanged() {
     if (!mounted) return;
+    final r = viewModel.renderResult;
+    final key =
+        '${viewModel.activeFile.path}|${viewModel.selectedEnvironment.id}|${r.state}|${r.pdfPath}|${r.content}';
+    if (key != _lastPreviewKey) {
+      _lastPreviewKey = key;
+      setState(() {});
+    }
     if (_pendingContent != null) return;
     final content = viewModel.activeFile.content;
     _controller.setEnvironment(viewModel.selectedEnvironment.id);
     if (_controller.text != content) {
       _controller.setTextFromModel(content);
     }
-    final r = viewModel.renderResult;
-    final key = '${viewModel.activeFile.path}|${viewModel.selectedEnvironment.id}|${r.state}|${r.pdfPath}|${r.content}';
-    if (key != _lastPreviewKey) {
-      _lastPreviewKey = key;
-      setState(() {});
-    }
   }
 
   void _handleEditorChanged(String content) {
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] _handleEditorChanged - editor changed',
+    );
     _pendingContent = content;
     _contentSyncTimer?.cancel();
     _contentSyncTimer = Timer(const Duration(milliseconds: 250), () {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] 250ms timer fired - flushing pending content',
+      );
       _flushPendingContent();
+    });
+    _renderDebounce?.cancel();
+    _renderDebounce = Timer(const Duration(milliseconds: 800), () {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] 800ms debounce fired - calling renderActiveFile',
+      );
+      if (mounted) viewModel.renderActiveFile();
     });
   }
 
@@ -185,8 +204,18 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   void _flushPendingContent() {
     final content = _pendingContent;
-    if (content == null) return;
+    if (content == null) {
+      LogBuffer.writeln(
+        LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] _flushPendingContent - no pending content',
+      );
+      return;
+    }
     _pendingContent = null;
+    LogBuffer.writeln(
+      LogCategory.render,
+      '[${DateTime.now().toString().substring(11, 19)}] Flushing ${content.length} chars to viewModel',
+    );
     if (!mounted && viewModel.activeFile.content == content) return;
     viewModel.updateActiveContent(content);
   }
@@ -257,10 +286,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   }
 
   void _showLogs() {
-    showDialog(
-      context: context,
-      builder: (context) => const LogViewerDialog(),
-    );
+    showDialog(context: context, builder: (context) => const LogViewerDialog());
   }
 
   bool get _canExportPdf {
@@ -280,7 +306,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       if (viewModel.renderResult.state != RenderState.success ||
           viewModel.renderResult.pdfPath == null) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Compilation failed. Fix errors and try again.')),
+          const SnackBar(
+            content: Text('Compilation failed. Fix errors and try again.'),
+          ),
         );
         return;
       }
@@ -297,7 +325,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
     final result = await FilePicker.saveFile(
       dialogTitle: 'Export PDF',
-      fileName: '${viewModel.activeFile.name.replaceAll(RegExp(r'\.[^.]+$'), '')}.pdf',
+      fileName:
+          '${viewModel.activeFile.name.replaceAll(RegExp(r'\.[^.]+$'), '')}.pdf',
       type: FileType.custom,
       allowedExtensions: ['pdf'],
     );
@@ -379,9 +408,25 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
           LogicalKeyboardKey.keyS,
           control: true,
         ): () async {
+          LogBuffer.writeln(
+            LogCategory.render,
+            '[${DateTime.now().toString().substring(11, 19)}] Ctrl+S pressed',
+          );
+          _renderDebounce?.cancel();
+          LogBuffer.writeln(
+            LogCategory.render,
+            '[${DateTime.now().toString().substring(11, 19)}] Debounce timer cancelled',
+          );
           _flushPendingContent();
+          LogBuffer.writeln(
+            LogCategory.render,
+            '[${DateTime.now().toString().substring(11, 19)}] Flushing pending content',
+          );
           await viewModel.saveActiveFile();
-          viewModel.renderActiveFile();
+          LogBuffer.writeln(
+            LogCategory.render,
+            '[${DateTime.now().toString().substring(11, 19)}] Save complete (render triggered internally)',
+          );
         },
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             _toggleFind,
@@ -406,8 +451,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                           child: AnimatedBuilder(
                             animation: _glowController,
                             builder: (context, _) {
-                          return CustomPaint(
-                            painter: AmbientGlowPainter(
+                              return CustomPaint(
+                                painter: AmbientGlowPainter(
                                   animationValue: _glowController.value,
                                 ),
                               );
@@ -419,11 +464,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                     Row(
                       children: [
                         WorkspaceRail(
-                          activeProjectTitle: viewModel.activeFile.projectRoot != null
-                              ? viewModel.activeFile.projectRoot!
-                                  .split(RegExp(r'[\\/]'))
-                                  .last
-                              : null,
+                          activeProjectTitle: viewModel.activeFile.projectRoot
+                              ?.split(RegExp(r'[\\/]'))
+                              .last,
                           openProjects: widget.openProjects,
                           pinnedProjects: widget.pinnedProjects,
                           onCloseProject: widget.onCloseProject,
@@ -443,28 +486,30 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                                   onCreateInvite: _createCollaborationInvite,
                                   onJoinInvite: _joinCollaborationInvite,
                                   onImportFile: null,
-                                  onExportPdf: _canExportPdf ? _exportToPdf : null,
+                                  onExportPdf: _canExportPdf
+                                      ? _exportToPdf
+                                      : null,
                                   canExportPdf: _canExportPdf,
                                   onAbout: widget.onAbout,
                                   onShowLogs: _showLogs,
                                 ),
                                 const SizedBox(height: 6),
                                 EditorContentFrame(
-                                      viewModel: viewModel,
-                                    controller: _controller,
-                                    editorFocusNode: _editorFocusNode,
-                                    onEditorChanged: _handleEditorChanged,
-                                    revealRevision: _revealRevision,
-                                    revealOffset: _revealOffset,
-                                    findOpen: _findOpen,
-                                    findController: _findController,
-                                    findFocusNode: _findFocusNode,
-                                    findMatches: _findMatches,
-                                    findCursor: _findCursor,
-                                    onToggleFind: _toggleFind,
-                                    onRefreshFind: _refreshFindMatches,
-                                    onMoveFind: _moveFind,
-                                  ),
+                                  viewModel: viewModel,
+                                  controller: _controller,
+                                  editorFocusNode: _editorFocusNode,
+                                  onEditorChanged: _handleEditorChanged,
+                                  revealRevision: _revealRevision,
+                                  revealOffset: _revealOffset,
+                                  findOpen: _findOpen,
+                                  findController: _findController,
+                                  findFocusNode: _findFocusNode,
+                                  findMatches: _findMatches,
+                                  findCursor: _findCursor,
+                                  onToggleFind: _toggleFind,
+                                  onRefreshFind: _refreshFindMatches,
+                                  onMoveFind: _moveFind,
+                                ),
                               ],
                             ),
                           ),
@@ -481,5 +526,3 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     );
   }
 }
-
-

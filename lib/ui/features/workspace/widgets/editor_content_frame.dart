@@ -52,81 +52,79 @@ class _EditorContentFrameState extends State<EditorContentFrame> {
   Widget build(BuildContext context) {
     final vm = widget.viewModel;
     return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          child: Row(
-            children: [
-              SizedBox(
-                width: 260,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Sidebar(
-                        section: _section,
-                        file: vm.activeFile,
-                        files: vm.projectFiles,
-                        environment: vm.selectedEnvironment,
-                        renderResult: vm.renderResult,
-                        onOpenFile: vm.openFile,
-                        onNewFile: vm.createFile,
-                        onNewFolder: vm.createFolder,
-                        onDeleteFile: vm.deleteFile,
-                      ),
-                    ),
-                    SidebarPill(
-                      section: _section,
-                      onChanged: (s) => setState(() => _section = s),
-                    ),
-                  ],
+      borderRadius: BorderRadius.circular(12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 260,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Sidebar(
+                    section: _section,
+                    file: vm.activeFile,
+                    files: vm.projectFiles,
+                    environment: vm.selectedEnvironment,
+                    renderResult: vm.renderResult,
+                    onOpenFile: vm.openFile,
+                    onNewFile: vm.createFile,
+                    onNewFolder: vm.createFolder,
+                    onDeleteFile: vm.deleteFile,
+                  ),
                 ),
-              ),
-              Container(width: 1, color: kBorder),
-              Expanded(
-                child: Column(
-                  children: [
-                    EditorTabBar(
-                      file: vm.activeFile,
-                      openFiles: vm.openFiles,
-                      onSelectFile: vm.openFile,
-                      onCloseFile: vm.closeFile,
-                    ),
-                    const SizedBox(height: 6),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          if (widget.findOpen)
-                            FindBar(
-                              controller: widget.findController,
-                              focusNode: widget.findFocusNode,
-                              matchCount: widget.findMatches.length,
-                              currentMatch: widget.findMatches.isEmpty
-                                  ? 0
-                                  : widget.findCursor + 1,
-                              onChanged: (_) => widget.onRefreshFind(),
-                              onPrevious: () => widget.onMoveFind(-1),
-                              onNext: () => widget.onMoveFind(1),
-                              onClose: widget.onToggleFind,
-                            ),
-                          Expanded(
-                            child: WorkspaceBody(
-                              viewModel: vm,
-                              controller: widget.controller,
-                              editorFocusNode: widget.editorFocusNode,
-                              onEditorChanged: widget.onEditorChanged,
-                              revealRevision: widget.revealRevision,
-                              revealOffset: widget.revealOffset,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                SidebarPill(
+                  section: _section,
+                  onChanged: (s) => setState(() => _section = s),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );
+          Container(width: 1, color: kBorder),
+          Expanded(
+            child: Column(
+              children: [
+                EditorTabBar(
+                  file: vm.activeFile,
+                  openFiles: vm.openFiles,
+                  onSelectFile: vm.openFile,
+                  onCloseFile: vm.closeFile,
+                ),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: Column(
+                    children: [
+                      if (widget.findOpen)
+                        FindBar(
+                          controller: widget.findController,
+                          focusNode: widget.findFocusNode,
+                          matchCount: widget.findMatches.length,
+                          currentMatch: widget.findMatches.isEmpty
+                              ? 0
+                              : widget.findCursor + 1,
+                          onChanged: (_) => widget.onRefreshFind(),
+                          onPrevious: () => widget.onMoveFind(-1),
+                          onNext: () => widget.onMoveFind(1),
+                          onClose: widget.onToggleFind,
+                        ),
+                      Expanded(
+                        child: WorkspaceBody(
+                          viewModel: vm,
+                          controller: widget.controller,
+                          editorFocusNode: widget.editorFocusNode,
+                          onEditorChanged: widget.onEditorChanged,
+                          revealRevision: widget.revealRevision,
+                          revealOffset: widget.revealOffset,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -204,11 +202,7 @@ class _PillButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 13,
-                color: selected ? kTextPrimary : kTextMuted,
-              ),
+              Icon(icon, size: 13, color: selected ? kTextPrimary : kTextMuted),
               const SizedBox(width: 4),
               Text(
                 label,

@@ -10,7 +10,7 @@ class InviteCodec {
       'v': 1,
       't': ticket,
       'h': hostName,
-      if (sessionId != null) 's': sessionId,
+      's': ?sessionId,
     };
     return 'whisk:${base64Url.encode(utf8.encode(jsonEncode(payload)))}';
   }
