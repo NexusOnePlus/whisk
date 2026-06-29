@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:whisk/ui/features/workspace/widgets/log_viewer_dialog.dart';
 import 'package:whisk/data/repositories/environment_catalog.dart';
 import 'package:whisk/data/services/collaboration_service.dart';
 import 'package:whisk/data/services/document_render_service.dart';
@@ -65,6 +66,7 @@ class WorkspaceViewModel extends ChangeNotifier {
   int _selectedEnvironmentIndex = 0;
   RenderResult _renderResult = const RenderResult.idle();
   final Map<String, RenderResult> _renderResultCache = {};
+  String? _pinnedPreviewPath;
   var _disposed = false;
 
   List<EnvironmentKind> get environments => List.unmodifiable(_environments);
@@ -74,7 +76,21 @@ class WorkspaceViewModel extends ChangeNotifier {
   EnvironmentKind get selectedEnvironment =>
       _environments[_selectedEnvironmentIndex];
   WhiskFile get activeFile => _activeFile;
-  RenderResult get renderResult => _renderResult;
+  RenderResult get renderResult {
+    if (_pinnedPreviewPath != null) {
+      return _renderResultCache[_pinnedPreviewPath] ??
+          const RenderResult.idle();
+    }
+    return _renderResult;
+  }
+
+  bool get isPreviewPinned => _pinnedPreviewPath != null;
+  String? get pinnedPreviewPath => _pinnedPreviewPath;
+
+  void setPreviewPin(String? filePath) {
+    _pinnedPreviewPath = filePath;
+    notifyListeners();
+  }
 
   bool get _isInlineEnv {
     final id = selectedEnvironment.id;
@@ -133,6 +149,9 @@ class WorkspaceViewModel extends ChangeNotifier {
     await saveActiveFile();
     if (_disposed) return;
 
+    LogBuffer.writeln(LogCategory.system,
+        '[${DateTime.now().toString().substring(11, 19)}] Open file: ${file.name}');
+
     _renderResultCache[_activeFile.path] = _renderResult;
 
     var next = file;
@@ -181,6 +200,9 @@ class WorkspaceViewModel extends ChangeNotifier {
       return;
     }
 
+    LogBuffer.writeln(LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] Rendering ${_activeFile.name} ($envId)...');
+
     _renderResult = const RenderResult.rendering();
     notifyListeners();
 
@@ -199,6 +221,24 @@ class WorkspaceViewModel extends ChangeNotifier {
     _renderResult = result;
     _renderResultCache[_activeFile.path] = result;
     notifyListeners();
+
+    final status = result.state == RenderState.success
+        ? 'OK'
+        : result.state == RenderState.failed
+            ? 'FAILED'
+            : '?';
+    LogBuffer.writeln(LogCategory.render,
+        '[${DateTime.now().toString().substring(11, 19)}] Render result: $status (${result.engine ?? envId})');
+
+    if (result.log.isNotEmpty) {
+      final lines = result.log.trim().split('\n');
+      final truncated = lines.length > 50
+          ? [...lines.take(50), '... (${lines.length - 50} more lines)']
+          : lines;
+      for (final line in truncated) {
+        LogBuffer.writeln(LogCategory.render, '  $line');
+      }
+    }
   }
 
   Future<void> saveActiveFile() async {
@@ -363,11 +403,32 @@ class WorkspaceViewModel extends ChangeNotifier {
     await _refreshProjectFiles();
   }
 
+  void closeFile(WhiskFile whiskFile) {
+    if (_disposed) return;
+    final wasActive = _activeFile.path == whiskFile.path;
+    _openFiles = _openFiles.where((f) => f.path != whiskFile.path).toList();
+    if (_openFiles.isEmpty) {
+      _activeFile = WhiskFile.empty;
+      _renderResult = const RenderResult.idle();
+      notifyListeners();
+      return;
+    }
+    if (wasActive) {
+      unawaited(openFile(_openFiles.first));
+    } else {
+      notifyListeners();
+    }
+  }
+
   Future<void> deleteFile(WhiskFile whiskFile) async {
     if (_disposed) return;
     final file = File(whiskFile.path);
     if (await file.exists()) {
       await file.delete();
+    }
+
+    if (_pinnedPreviewPath == whiskFile.path) {
+      _pinnedPreviewPath = null;
     }
 
     _openFiles = _openFiles.where((f) => f.path != whiskFile.path).toList();

@@ -12,6 +12,7 @@ import 'package:whisk/domain/models/collaboration_peer.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/src/rust/api/collaboration.dart';
 import 'package:whisk/ui/features/editor/models/editor_text_operation.dart';
+import 'package:whisk/ui/features/workspace/widgets/log_viewer_dialog.dart';
 
 class CollaborationServiceP2p
     implements CollaborationService, CollaborationTransportClient {
@@ -526,6 +527,8 @@ class CollaborationServiceP2p
     final invite = envelope.invite;
     if (remotePeerId == null || invite == null) return;
     if (remotePeerId == peerId) return;
+    LogBuffer.writeln(LogCategory.collab,
+        'Peer joined: ${_shortPeerId(remotePeerId)}');
     final isNewPeer = !_remoteInvites.containsKey(remotePeerId);
     _remoteInvites[remotePeerId] = invite;
     _markIrohPeerSeen(remotePeerId);
@@ -579,6 +582,8 @@ class CollaborationServiceP2p
   void _handleIrohGoodbye(_IrohEnvelope envelope) {
     final remotePeerId = envelope.peerId;
     if (remotePeerId == null || remotePeerId == peerId) return;
+    LogBuffer.writeln(LogCategory.collab,
+        '[collab] Peer left: ${_shortPeerId(remotePeerId)}');
     _remoteInvites.remove(remotePeerId);
     _irohPresence.remove(remotePeerId);
     _remoteStateVectors.remove(remotePeerId);
@@ -729,6 +734,8 @@ class CollaborationServiceP2p
     ];
     if (stalePeerIds.isEmpty) return;
     for (final peerId in stalePeerIds) {
+      LogBuffer.writeln(LogCategory.collab,
+          '[collab] Peer timed out: ${_shortPeerId(peerId)}');
       _remoteInvites.remove(peerId);
       _irohPresence.remove(peerId);
       _remoteStateVectors.remove(peerId);
