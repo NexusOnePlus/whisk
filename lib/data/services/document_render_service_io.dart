@@ -16,23 +16,14 @@ class DocumentRenderService {
   final EngineProvisionService engineProvisionService;
 
   static Future<void> _safeWriteFile(File target, String content) async {
-    final tempPath = '${target.path}.${DateTime.now().microsecondsSinceEpoch}.tmp';
-    final temp = File(tempPath);
-    await temp.writeAsString(content);
-    try {
-      await temp.rename(target.path);
-    } on FileSystemException {
+    for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        if (await target.exists()) await target.delete();
-        await temp.rename(target.path);
+        await target.writeAsString(content);
+        return;
       } on FileSystemException {
-        try {
-          await target.writeAsString(content);
-        } on FileSystemException {
-          try { await temp.delete(); } catch (_) {}
-          rethrow;
+        if (attempt < 2) {
+          await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
         }
-        try { await temp.delete(); } catch (_) {}
       }
     }
   }
@@ -300,6 +291,9 @@ class DocumentRenderService {
     final env = <String, String>{
       'WHISK_CACHE_DIR': cacheRoot.path,
       'TYPST_PACKAGE_CACHE': '${cacheRoot.path}${Platform.pathSeparator}typst',
+      'TMPDIR': cacheRoot.path,
+      'TEMP': cacheRoot.path,
+      'TMP': cacheRoot.path,
     };
 
     final fontconfigFile = File('${cacheRoot.path}${Platform.pathSeparator}fontconfig.conf');
