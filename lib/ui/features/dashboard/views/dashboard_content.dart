@@ -115,34 +115,12 @@ class _NavbarFrame extends StatelessWidget {
           Expanded(
             child: Align(
               alignment: Alignment.center,
-              child: FractionallySizedBox(
-                widthFactor: 0.5,
-                child: Row(
-                  children: [
-                    Icon(Icons.search_rounded, color: kTextMuted, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        style: const TextStyle(
-                          color: kTextPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'Buscar proyectos, comandos...',
-                          hintStyle: TextStyle(
-                            color: kTextMuted,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 14),
-                        ),
-                      ),
-                    ),
-                  ],
+              child: Text(
+                'Whisk',
+                style: TextStyle(
+                  color: kTextPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),

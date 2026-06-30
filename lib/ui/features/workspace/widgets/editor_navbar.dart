@@ -5,6 +5,9 @@ class EditorNavbar extends StatelessWidget {
   const EditorNavbar({
     super.key,
     required this.onCloseWorkspace,
+    this.projectTitle,
+    this.collectionName,
+    this.tags = const [],
     this.onCreateInvite,
     this.onJoinInvite,
     this.onImportFile,
@@ -15,6 +18,9 @@ class EditorNavbar extends StatelessWidget {
   });
 
   final VoidCallback onCloseWorkspace;
+  final String? projectTitle;
+  final String? collectionName;
+  final List<String> tags;
   final VoidCallback? onCreateInvite;
   final VoidCallback? onJoinInvite;
   final VoidCallback? onImportFile;
@@ -74,41 +80,49 @@ class EditorNavbar extends StatelessWidget {
               ),
             ],
           ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.center,
-              child: FractionallySizedBox(
-                widthFactor: 0.5,
-                child: Row(
+          if (projectTitle != null)
+            Expanded(
+              child: Align(
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.search_rounded, color: kTextMuted, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
+                    if (collectionName != null)
+                      Text(
+                        '$collectionName > $projectTitle',
+                        style: const TextStyle(
+                          color: kTextPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    else
+                      Text(
+                        projectTitle!,
                         style: const TextStyle(
                           color: kTextPrimary,
                           fontSize: 14,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: FontWeight.w500,
                         ),
-                        decoration: const InputDecoration(
-                          hintText: 'Buscar en el workspace...',
-                          hintStyle: TextStyle(
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    if (tags.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          tags.join(' · '),
+                          style: TextStyle(
                             color: kTextMuted,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
+                            fontSize: 11,
                           ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 14),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      ),
-                    ],
+                  ],
                 ),
               ),
             ),
-          ),
           IconButton(
             tooltip: 'Create collaboration invite',
             onPressed: onCreateInvite,
