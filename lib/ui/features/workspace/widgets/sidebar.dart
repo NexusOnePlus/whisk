@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -885,7 +886,8 @@ class _SearchSectionState extends State<_SearchSection> {
         if (searchLines.isNotEmpty) {
           matches.add(_ContentMatch(file: f, lines: searchLines, nameMatch: false));
         }
-      } catch (_) {
+      } catch (e) {
+        dev.log('Search failed for file: $e', name: 'Sidebar');
       }
     }
 
