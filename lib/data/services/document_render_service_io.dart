@@ -1,3 +1,4 @@
+import 'dart:developer' as dev;
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -142,28 +143,32 @@ class DocumentRenderService {
                   entity.path != defaultPdf.path) {
                 try {
                   entity.deleteSync();
-                } catch (_) {}
+                } catch (e) {
+                  dev.log('Failed to delete old PDF: $e', name: 'DocumentRenderService');
+                }
               }
             }
           }
-        } catch (_) {}
-
-        try {
-          await defaultPdf.rename(finalPdf.path);
-          await _generateThumbnail(finalPdf.path, build.path);
-          return RenderResult.success(
-            pdfPath: finalPdf.path,
-            engine: attempt.engine,
-            log: logs.toString(),
-          );
-        } catch (_) {
-          await _generateThumbnail(defaultPdf.path, build.path);
-          return RenderResult.success(
-            pdfPath: defaultPdf.path,
-            engine: attempt.engine,
-            log: logs.toString(),
-          );
+        } catch (e) {
+          dev.log('Failed to list build directory: $e', name: 'DocumentRenderService');
         }
+
+      try {
+        await defaultPdf.rename(finalPdf.path);
+        await _generateThumbnail(finalPdf.path, build.path);
+        return RenderResult.success(
+          pdfPath: finalPdf.path,
+          engine: attempt.engine,
+          log: logs.toString(),
+        );
+      } catch (_) {
+        await _generateThumbnail(defaultPdf.path, build.path);
+        return RenderResult.success(
+          pdfPath: defaultPdf.path,
+          engine: attempt.engine,
+          log: logs.toString(),
+        );
+      }
       }
     }
 
@@ -211,11 +216,15 @@ class DocumentRenderService {
             if (entity is File && entity.path.endsWith('.pdf')) {
               try {
                 entity.deleteSync();
-              } catch (_) {}
+              } catch (e) {
+                dev.log('Failed to delete old typst PDF: $e', name: 'DocumentRenderService');
+              }
             }
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        dev.log('Failed to list typst build directory: $e', name: 'DocumentRenderService');
+      }
 
       final result = await _tryRun(
         _RenderAttempt(
@@ -269,7 +278,9 @@ class DocumentRenderService {
       ).writeAsBytes(byteData.buffer.asUint8List());
       image.dispose();
       await doc.dispose();
-    } catch (_) {}
+    } catch (e) {
+      dev.log('Failed to generate thumbnail: $e', name: 'DocumentRenderService');
+    }
   }
 
   Future<_ProcessResult> _tryRun(

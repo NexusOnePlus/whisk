@@ -419,7 +419,8 @@ class CollaborationServiceP2p
       String oldText;
       try {
         oldText = engine.getText(filePath: envelope.filePath!);
-      } catch (_) {
+      } catch (e) {
+        LogBuffer.writeln(LogCategory.collab, '[collab] Failed to get old text: $e');
         continue;
       }
       final applied = engine.applyRemoteUpdate(
@@ -430,7 +431,8 @@ class CollaborationServiceP2p
       final String newText;
       try {
         newText = engine.getText(filePath: envelope.filePath!);
-      } catch (_) {
+      } catch (e) {
+        LogBuffer.writeln(LogCategory.collab, '[collab] Failed to get new text: $e');
         continue;
       }
       if (envelope.peerId != null && envelope.stateVector != null) {
