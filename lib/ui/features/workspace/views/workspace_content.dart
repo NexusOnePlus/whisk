@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:whisk/data/services/collection_service.dart';
 import 'package:whisk/data/services/invite_codec.dart';
+import 'package:whisk/data/services/project_tags_service.dart';
 import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/domain/models/render_result.dart';
 import 'package:whisk/ui/core/ambient_glow_painter.dart';
@@ -78,9 +80,15 @@ class _WorkspaceContentState extends State<WorkspaceContent>
     _findFocusNode = FocusNode();
     _controller.addListener(() {});
     viewModel.addListener(_onViewModelChanged);
+    SettingsService.instance.addListener(_onSettingsChanged);
+    ProjectTagsService.instance.addListener(_onSettingsChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) viewModel.renderActiveFile();
     });
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -104,6 +112,8 @@ class _WorkspaceContentState extends State<WorkspaceContent>
     _renderDebounce?.cancel();
     _glowController.dispose();
     viewModel.removeListener(_onViewModelChanged);
+    SettingsService.instance.removeListener(_onSettingsChanged);
+    ProjectTagsService.instance.removeListener(_onSettingsChanged);
     _controller.dispose();
     _editorFocusNode.dispose();
     _findController.dispose();
@@ -347,6 +357,14 @@ class _WorkspaceContentState extends State<WorkspaceContent>
                       children: [
                         EditorNavbar(
                           onCloseWorkspace: widget.onCloseWorkspace ?? () {},
+                          projectTitle: SettingsService.instance
+                              .displayNameFor(
+                                  viewModel.activeFile.projectRoot ?? ''),
+                          collectionName: CollectionService.instance
+                              .collectionForProject(
+                                  viewModel.activeFile.projectRoot ?? ''),
+                          tags: ProjectTagsService.instance.tagsFor(
+                              viewModel.activeFile.projectRoot ?? ''),
                           onCreateInvite: _createCollaborationInvite,
                           onJoinInvite: _joinCollaborationInvite,
                           onExportPdf: _canExportPdf ? _exportToPdf : null,

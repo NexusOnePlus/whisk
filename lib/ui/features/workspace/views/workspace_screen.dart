@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:whisk/data/services/collection_service.dart';
 import 'package:whisk/data/services/invite_codec.dart';
+import 'package:whisk/data/services/project_tags_service.dart';
 import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/domain/models/collaboration_text_update.dart';
 import 'package:whisk/domain/models/render_result.dart';
@@ -91,6 +93,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     );
     _controller.addListener(_schedulePresenceSync);
     viewModel.addListener(_onViewModelChanged);
+    SettingsService.instance.addListener(_onSettingsChanged);
+    ProjectTagsService.instance.addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -116,6 +124,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     _operationSubscription?.cancel();
     _remoteTextSubscription?.cancel();
     viewModel.removeListener(_onViewModelChanged);
+    SettingsService.instance.removeListener(_onSettingsChanged);
+    ProjectTagsService.instance.removeListener(_onSettingsChanged);
     _controller.removeListener(_schedulePresenceSync);
     _controller.dispose();
     _editorFocusNode.dispose();
@@ -485,6 +495,14 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                               children: [
                                 EditorNavbar(
                                   onCloseWorkspace: widget.onCloseWorkspace,
+                                  projectTitle: SettingsService.instance
+                                      .displayNameFor(
+                                          viewModel.activeFile.projectRoot ?? ''),
+                                  collectionName: CollectionService.instance
+                                      .collectionForProject(
+                                          viewModel.activeFile.projectRoot ?? ''),
+                                  tags: ProjectTagsService.instance.tagsFor(
+                                      viewModel.activeFile.projectRoot ?? ''),
                                   onCreateInvite: _createCollaborationInvite,
                                   onJoinInvite: _joinCollaborationInvite,
                                   onImportFile: null,

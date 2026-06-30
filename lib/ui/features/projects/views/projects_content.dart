@@ -44,16 +44,20 @@ class _ProjectsContentState extends State<ProjectsContent> {
     super.initState();
     _tagsService.load();
     _collectionService.load();
-    _collectionService.addListener(_onCollectionsChanged);
+    _collectionService.addListener(_onChanged);
+    _tagsService.addListener(_onChanged);
+    SettingsService.instance.addListener(_onChanged);
   }
 
   @override
   void dispose() {
-    _collectionService.removeListener(_onCollectionsChanged);
+    _collectionService.removeListener(_onChanged);
+    _tagsService.removeListener(_onChanged);
+    SettingsService.instance.removeListener(_onChanged);
     super.dispose();
   }
 
-  void _onCollectionsChanged() => setState(() {});
+  void _onChanged() => setState(() {});
 
   List<String> get _allProjects {
     final all = <String>{

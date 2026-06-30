@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:whisk/data/repositories/environment_catalog.dart';
+import 'package:whisk/data/services/collection_service.dart';
 import 'package:whisk/data/services/collaboration_service_p2p.dart';
 import 'package:whisk/data/services/invite_codec.dart';
 import 'package:whisk/data/services/pinned_project_service.dart';
@@ -25,7 +26,13 @@ class AppShellViewModel extends ChangeNotifier {
     _pinnedProjectService.load();
     SettingsService.instance.load();
     ProjectTagsService.instance.load();
+    CollectionService.instance.load();
+    SettingsService.instance.addListener(_onServiceChanged);
+    ProjectTagsService.instance.addListener(_onServiceChanged);
+    CollectionService.instance.addListener(_onServiceChanged);
   }
+
+  void _onServiceChanged() => notifyListeners();
 
   final RecentProjectService _recentProjectService = RecentProjectService();
   final PinnedProjectService _pinnedProjectService = PinnedProjectService();
@@ -436,6 +443,9 @@ class AppShellViewModel extends ChangeNotifier {
     }
     _recentProjectService.removeListener(_onRecentsChanged);
     _pinnedProjectService.removeListener(_onPinnedChanged);
+    SettingsService.instance.removeListener(_onServiceChanged);
+    ProjectTagsService.instance.removeListener(_onServiceChanged);
+    CollectionService.instance.removeListener(_onServiceChanged);
     super.dispose();
   }
 }

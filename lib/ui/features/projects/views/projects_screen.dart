@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:whisk/data/services/project_tags_service.dart';
+import 'package:whisk/data/services/settings_service.dart';
 import 'package:whisk/ui/core/ambient_glow_painter.dart';
 import 'package:whisk/ui/core/whisk_colors.dart';
 import 'package:whisk/ui/features/workspace/widgets/workspace_rail.dart';
@@ -49,13 +50,19 @@ class _ProjectsScreenState extends State<ProjectsScreen>
       vsync: this,
     )..repeat();
     _tagsService.load();
+    _tagsService.addListener(_onChanged);
+    SettingsService.instance.addListener(_onChanged);
   }
 
   @override
   void dispose() {
+    _tagsService.removeListener(_onChanged);
+    SettingsService.instance.removeListener(_onChanged);
     _glowController.dispose();
     super.dispose();
   }
+
+  void _onChanged() => setState(() {});
 
   List<String> get _allProjects {
     final all = <String>{...widget.pinnedProjects, ...widget.openProjects};
